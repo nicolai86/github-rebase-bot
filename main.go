@@ -1,114 +1,41 @@
 package main
 
 import (
-	"bytes"
 	"flag"
-	"fmt"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
-	"os/exec"
 	"os/signal"
-	"strings"
 	"syscall"
 
 	"github.com/google/go-github/github"
+	"github.com/nicolai86/github-rebase-bot/repo"
 	"golang.org/x/oauth2"
 )
 
-func clone(accessToken, owner, repo, branch string) (string, error) {
-	dir, err := ioutil.TempDir("", fmt.Sprintf("gh-%s-%s", owner, repo))
-	if err != nil {
-		return "", err
-	}
-
-	cmds := [][]string{
-		[]string{"git",
-			"clone",
-			fmt.Sprintf("https://%s@github.com/%s/%s.git", accessToken, owner, repo),
-			"--branch", branch,
-			// "--depth", "1",
-			dir,
-		},
-	}
-
-	var output bytes.Buffer
-	for _, args := range cmds {
-		cmd := exec.Command(args[0], args[1:]...)
-		cmd.Dir = dir
-		cmd.Stdout = &output
-		cmd.Env = os.Environ()
-		if err := cmd.Run(); err != nil {
-			return "", err
-		}
-		log.Printf("%v: %v", args, string(output.Bytes()))
-	}
-
-	return dir, nil
-}
-
-func rebase(dir string) (bool, error) {
-	cmds := [][]string{
-		[]string{"git", "remote", "update"},
-		[]string{"git", "rebase", "origin/master"},
-	}
-
-	var output bytes.Buffer
-	for _, args := range cmds {
-		output.Reset()
-
-		cmd := exec.Command(args[0], args[1:]...)
-		cmd.Dir = dir
-		cmd.Env = os.Environ()
-		cmd.Stdout = &output
-		if err := cmd.Run(); err != nil {
-			return false, err
-		}
-
-		log.Printf("%v: %v", args, string(output.Bytes()))
-	}
-
-	if strings.Contains(string(output.Bytes()), "is up to date") {
-		return false, nil
-	}
-
-	return true, nil
-}
-
-func push(dir string) error {
-	cmds := [][]string{
-		[]string{"git", "push", "-f"},
-	}
-
-	var output bytes.Buffer
-	for _, args := range cmds {
-		cmd := exec.Command(args[0], args[1:]...)
-		cmd.Dir = dir
-		cmd.Env = os.Environ()
-		cmd.Stdout = &output
-		if err := cmd.Run(); err != nil {
-			return err
-		}
-		log.Printf("%v: %v", args, string(output.Bytes()))
-	}
-
-	return nil
-}
-
 var (
-	token string
-	owner string
-	repo  string
+	token      string
+	owner      string
+	repository string
+
+	cache *repo.Cache
 )
 
 func main() {
 	var publicDNS string
 	flag.StringVar(&token, "github-token", "", "auth token for GH")
 	flag.StringVar(&owner, "owner", "", "github owner")
-	flag.StringVar(&repo, "repo", "", "github repo (owned by owner)")
+	flag.StringVar(&repository, "repo", "", "github repo (owned by owner)")
 	flag.StringVar(&publicDNS, "public-dns", "", "publicly accessible dns endpoint for webhook push")
 	flag.Parse()
+
+	{
+		c, err := repo.New(token, owner, repository)
+		if err != nil {
+			log.Fatal(err)
+		}
+		cache = c
+	}
 
 	ts := oauth2.StaticTokenSource(
 		&oauth2.Token{AccessToken: token},
@@ -127,7 +54,7 @@ func main() {
 
 	var h *github.Hook
 	if publicDNS != "" {
-		h, err = registerHook(client, publicDNS, owner, repo)
+		h, err = registerHook(client, publicDNS, owner, repository)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -141,7 +68,7 @@ func main() {
 		for sig := range c {
 			log.Printf("Received %s, exiting.", sig.String())
 			if h != nil {
-				client.Repositories.DeleteHook(owner, repo, *h.ID)
+				client.Repositories.DeleteHook(owner, repository, *h.ID)
 			}
 			os.Exit(0)
 		}

@@ -9,8 +9,6 @@ import (
 	"github.com/google/go-github/github"
 )
 
-// TODO ensure same PRs are not merged in parallel: introduce a merge queue
-
 func prHandler(client *github.Client) http.HandlerFunc {
 	var issueQueue = make(chan *github.IssuesEvent)
 	var prQueue = make(chan *github.PullRequest)
@@ -25,7 +23,7 @@ func prHandler(client *github.Client) http.HandlerFunc {
 		for {
 			pr := <-mergeQueue
 
-			status, _, err := client.Repositories.GetCombinedStatus(owner, repo, *pr.Head.SHA, &github.ListOptions{})
+			status, _, err := client.Repositories.GetCombinedStatus(owner, repository, *pr.Head.SHA, &github.ListOptions{})
 			if err != nil {
 				continue
 			}
@@ -41,7 +39,7 @@ func prHandler(client *github.Client) http.HandlerFunc {
 
 			result, _, err := client.PullRequests.Merge(
 				owner,
-				repo,
+				repository,
 				*pr.Number,
 				"merge-bot merged",
 				&github.PullRequestOptions{
@@ -57,34 +55,31 @@ func prHandler(client *github.Client) http.HandlerFunc {
 
 	// process LGTM'd pull requests: rebase if necessary. can run in parallel. Can run in parallel
 	go func() {
+		<-cache.Wait()
 		log.Printf("rebase queue: started")
 
 		for {
 			prID := <-rebaseQueue
-			pr, _, err := client.PullRequests.Get(owner, repo, prID)
+			log.Printf("processing rebase PR #%d", prID)
+			pr, _, err := client.PullRequests.Get(owner, repository, prID)
 			if err != nil {
+				log.Printf("Failed to fetch PR: %v", err)
 				continue
 			}
 
-			// TODO do not clone all the time. clone once on startup to speed things up. every worker needs separate repo clone
-			dir, err := clone(token, owner, repo, *pr.Head.Ref)
+			w, err := cache.Worker(*pr.Head.Ref, prID)
 			if err != nil {
+				log.Printf("Failed to get worker: %v", err)
 				continue
 			}
-
-			rebaseChanged, err := rebase(dir)
-			if err != nil {
-				// TODO add comment that PR can not be rebased/ pushed automatically
-				continue
-			}
-			if rebaseChanged {
-				if err := push(dir); err != nil {
-					// TODO add comment that PR can not be rebased/ pushed automatically
-					continue
+			c := make(chan error)
+			w.Queue <- c
+			go func(pr *github.PullRequest) {
+				err := <-c
+				if err == nil {
+					mergeQueue <- pr
 				}
-			}
-
-			mergeQueue <- pr
+			}(pr)
 		}
 	}()
 
@@ -93,14 +88,16 @@ func prHandler(client *github.Client) http.HandlerFunc {
 		log.Printf("lgtm queue: started")
 		for {
 			pr := <-prQueue
-
-			issue, _, err := client.Issues.Get(owner, repo, *pr.Number)
+			log.Printf("processing PR #%d", *pr.Number)
+			issue, _, err := client.Issues.Get(owner, repository, *pr.Number)
 			if err != nil {
+				log.Printf("unable to fetch issues: %v", err)
 				continue
 			}
 
 			if len(issue.Labels) == 0 {
-				client.Issues.AddLabelsToIssue(owner, repo, *pr.Number, []string{"WIP"})
+				client.Issues.AddLabelsToIssue(owner, repository, *pr.Number, []string{"WIP"})
+				log.Printf("Added WIP label")
 				continue
 			}
 
@@ -109,6 +106,7 @@ func prHandler(client *github.Client) http.HandlerFunc {
 				isLGTM = isLGTM || *label.Name == "LGTM"
 			}
 			if !isLGTM {
+				log.Printf("Not LGTM")
 				continue
 			}
 
@@ -121,7 +119,7 @@ func prHandler(client *github.Client) http.HandlerFunc {
 		for {
 			evt := <-issueQueue
 
-			pr, _, err := client.PullRequests.Get(owner, repo, *evt.Issue.Number)
+			pr, _, err := client.PullRequests.Get(owner, repository, *evt.Issue.Number)
 			if err != nil {
 				continue
 			}
@@ -135,7 +133,7 @@ func prHandler(client *github.Client) http.HandlerFunc {
 		for {
 			evt := <-statusQueue
 
-			prs, _, err := client.PullRequests.List(owner, repo, &github.PullRequestListOptions{
+			prs, _, err := client.PullRequests.List(owner, repository, &github.PullRequestListOptions{
 				State: "open",
 			})
 			if err != nil {
