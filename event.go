@@ -10,11 +10,11 @@ import (
 )
 
 func prHandler(client *github.Client) http.HandlerFunc {
-	var issueQueue = make(chan *github.IssuesEvent)
-	var prQueue = make(chan *github.PullRequest)
-	var rebaseQueue = make(chan int)
 	var mergeQueue = make(chan *github.PullRequest)
-	var statusQueue = make(chan *github.StatusEvent)
+	var rebaseQueue = make(chan int, 100)
+	var issueQueue = make(chan *github.IssuesEvent, 100)
+	var prQueue = make(chan *github.PullRequest, 100)
+	var statusQueue = make(chan *github.StatusEvent, 100)
 
 	// process rebased, successful pull requests. merge if possible (tests green, mergeable)
 	go func() {
