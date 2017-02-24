@@ -89,6 +89,11 @@ func prHandler(client *github.Client) http.HandlerFunc {
 		for {
 			pr := <-prQueue
 			log.Printf("processing PR #%d", *pr.Number)
+			if *pr.State != "open" {
+				log.Printf("PR is not open")
+				continue
+			}
+
 			issue, _, err := client.Issues.Get(owner, repository, *pr.Number)
 			if err != nil {
 				log.Printf("unable to fetch issues: %v", err)
