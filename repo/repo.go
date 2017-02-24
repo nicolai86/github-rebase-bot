@@ -72,12 +72,34 @@ func (w *Worker) prepare() error {
 	return nil
 }
 
+func (w *Worker) cleanup() {
+	{
+		cmd := exec.Command("git", "worktree", "unlock", "-b", w.branch)
+		cmd.Dir = w.cache.dir
+		cmd.Env = os.Environ()
+		cmd.Run()
+	}
+	{
+		cmd := exec.Command("rm", "-fr", w.dir)
+		cmd.Env = os.Environ()
+		cmd.Run()
+	}
+	{
+		cmd := exec.Command("git", "worktree", "prune")
+		cmd.Dir = w.cache.dir
+		cmd.Env = os.Environ()
+		cmd.Run()
+	}
+}
+
 func (w *Worker) run() {
 	for {
 		select {
 		case ch := <-w.Queue:
+			w.prepare()
 			if err := w.cache.update(); err != nil {
 				log.Printf("failed to update master: %v", err)
+				w.cleanup()
 				ch <- err
 				close(ch)
 				continue
@@ -86,6 +108,7 @@ func (w *Worker) run() {
 			changed, err := w.rebase()
 			if err != nil {
 				log.Printf("failed to rebase master: %v", err)
+				w.cleanup()
 				ch <- err
 				close(ch)
 				continue
@@ -93,11 +116,14 @@ func (w *Worker) run() {
 			if changed {
 				if err := w.push(); err != nil {
 					log.Printf("failed to push branch: %v", err)
+					w.cleanup()
 					ch <- err
-					close(ch)
 					continue
 				}
+				w.cleanup()
+				close(ch)
 			} else {
+				w.cleanup()
 				close(ch)
 				log.Printf("up2date")
 			}
