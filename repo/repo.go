@@ -188,13 +188,26 @@ func New(token, owner, repo string) (*Cache, error) {
 }
 
 func (c *Cache) update() error {
-	// cmd := exec.Command("git", "fetch", "--all")
-	cmd := exec.Command("git", "remote", "update")
 	c.mu.Lock()
 	defer c.mu.Unlock()
+
+	cmd := exec.Command("git", "fetch", "--all")
+	// cmd := exec.Command("git", "remote", "update")
 	cmd.Dir = c.dir
 	cmd.Env = os.Environ()
-	return cmd.Run()
+	if err := cmd.Run(); err != nil {
+		log.Printf("git fetch --all failed")
+		return err
+	}
+
+	cmd = exec.Command("git", "reset", "--hard", "origin/master")
+	cmd.Dir = c.dir
+	cmd.Env = os.Environ()
+	if err := cmd.Run(); err != nil {
+		log.Printf("git reset --hard origin/master failed")
+		return err
+	}
+	return nil
 }
 
 func (c *Cache) remove(w *Worker) {
