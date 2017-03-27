@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -16,6 +17,7 @@ type Cache struct {
 	owner string
 	repo  string
 	dir   string
+	mu    sync.Mutex
 
 	populate chan struct{}
 	workers  map[int]*Worker
@@ -170,6 +172,8 @@ func New(token, owner, repo string) (*Cache, error) {
 func (c *Cache) update() error {
 	// cmd := exec.Command("git", "fetch", "--all")
 	cmd := exec.Command("git", "remote", "update")
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	cmd.Dir = c.dir
 	cmd.Env = os.Environ()
 	return cmd.Run()
