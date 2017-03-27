@@ -46,7 +46,7 @@ func (w *Worker) rebase() (bool, error) {
 }
 
 func (w *Worker) push() error {
-	cmd := exec.Command("git", "push", "-f")
+	cmd := exec.Command("git", "push", "--set-upstream", "origin", w.branch, "-f")
 	cmd.Dir = w.dir
 	cmd.Env = os.Environ()
 	return cmd.Run()
