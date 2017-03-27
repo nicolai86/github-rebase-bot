@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -23,7 +24,7 @@ func prHandler(client *github.Client) http.HandlerFunc {
 		for {
 			pr := <-mergeQueue
 
-			status, _, err := client.Repositories.GetCombinedStatus(owner, repository, *pr.Head.SHA, &github.ListOptions{})
+			status, _, err := client.Repositories.GetCombinedStatus(context.Background(), owner, repository, *pr.Head.SHA, &github.ListOptions{})
 			if err != nil {
 				continue
 			}
@@ -38,6 +39,7 @@ func prHandler(client *github.Client) http.HandlerFunc {
 			}
 
 			result, _, err := client.PullRequests.Merge(
+				context.Background(),
 				owner,
 				repository,
 				*pr.Number,
@@ -61,7 +63,7 @@ func prHandler(client *github.Client) http.HandlerFunc {
 		for {
 			prID := <-rebaseQueue
 			log.Printf("processing rebase PR #%d", prID)
-			pr, _, err := client.PullRequests.Get(owner, repository, prID)
+			pr, _, err := client.PullRequests.Get(context.Background(), owner, repository, prID)
 			if err != nil {
 				log.Printf("Failed to fetch PR: %v", err)
 				continue
@@ -94,14 +96,14 @@ func prHandler(client *github.Client) http.HandlerFunc {
 				continue
 			}
 
-			issue, _, err := client.Issues.Get(owner, repository, *pr.Number)
+			issue, _, err := client.Issues.Get(context.Background(), owner, repository, *pr.Number)
 			if err != nil {
 				log.Printf("unable to fetch issues: %v", err)
 				continue
 			}
 
 			if len(issue.Labels) == 0 {
-				client.Issues.AddLabelsToIssue(owner, repository, *pr.Number, []string{"WIP"})
+				client.Issues.AddLabelsToIssue(context.Background(), owner, repository, *pr.Number, []string{"WIP"})
 				log.Printf("Added WIP label")
 				continue
 			}
@@ -124,7 +126,7 @@ func prHandler(client *github.Client) http.HandlerFunc {
 		for {
 			evt := <-issueQueue
 
-			pr, _, err := client.PullRequests.Get(owner, repository, *evt.Issue.Number)
+			pr, _, err := client.PullRequests.Get(context.Background(), owner, repository, *evt.Issue.Number)
 			if err != nil {
 				continue
 			}
@@ -138,7 +140,7 @@ func prHandler(client *github.Client) http.HandlerFunc {
 		for {
 			evt := <-statusQueue
 
-			prs, _, err := client.PullRequests.List(owner, repository, &github.PullRequestListOptions{
+			prs, _, err := client.PullRequests.List(context.Background(), owner, repository, &github.PullRequestListOptions{
 				State: "open",
 			})
 			if err != nil {

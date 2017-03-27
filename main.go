@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"log"
 	"net/http"
@@ -44,7 +45,7 @@ func main() {
 
 	client := github.NewClient(tc)
 
-	user, _, err := client.Users.Get("")
+	user, _, err := client.Users.Get(context.Background(), "")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -68,7 +69,7 @@ func main() {
 		for sig := range c {
 			log.Printf("Received %s, exiting.", sig.String())
 			if h != nil {
-				client.Repositories.DeleteHook(owner, repository, *h.ID)
+				client.Repositories.DeleteHook(context.Background(), owner, repository, *h.ID)
 			}
 			os.Exit(0)
 		}

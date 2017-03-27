@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -8,7 +9,7 @@ import (
 )
 
 func createHook(client *github.Client, publicDNS, owner, repo string) (*github.Hook, error) {
-	hook, _, err := client.Repositories.CreateHook(owner, repo, &github.Hook{
+	hook, _, err := client.Repositories.CreateHook(context.Background(), owner, repo, &github.Hook{
 		Name:   github.String("web"),
 		Active: github.Bool(true),
 		Config: map[string]interface{}{
@@ -26,7 +27,7 @@ func createHook(client *github.Client, publicDNS, owner, repo string) (*github.H
 }
 
 func lookupHook(client *github.Client, publicDNS, owner, repo string) (*github.Hook, error) {
-	hooks, _, err := client.Repositories.ListHooks(owner, repo, &github.ListOptions{})
+	hooks, _, err := client.Repositories.ListHooks(context.Background(), owner, repo, &github.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
