@@ -1,10 +1,8 @@
 package repo
 
 import (
-	"bytes"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
 	"os/exec"
 	"strings"
@@ -12,6 +10,7 @@ import (
 	"time"
 
 	"github.com/nicolai86/github-rebase-bot/cmd"
+	"github.com/nicolai86/github-rebase-bot/log"
 )
 
 type Cache struct {
@@ -46,16 +45,15 @@ func (w *Worker) inCacheDirectory() func(*exec.Cmd) {
 }
 
 func (w *Worker) rebase() (bool, error) {
-	var stdout bytes.Buffer
-	cmd := exec.Command("git", "rebase", "origin/master")
-	cmd.Dir = w.dir
-	cmd.Stdout = &stdout
-	cmd.Env = os.Environ()
-	err := cmd.Run()
+	stdout, stderr, err := cmd.Pipeline([]*exec.Cmd{
+		cmd.MustConfigure(exec.Command("git", "rebase", "origin/master"), w.inCacheDirectory()),
+	}).Run()
+	log.PrintLinesPrefixed(w.branch, stdout)
+	log.PrintLinesPrefixed(w.branch, stderr)
 	if err != nil {
 		return false, err
 	}
-	up2date := strings.Contains(string(stdout.Bytes()), "is up to date")
+	up2date := strings.Contains(stdout, "is up to date")
 	return !up2date, nil
 }
 
@@ -67,21 +65,26 @@ func (w *Worker) push() error {
 }
 
 func (w *Worker) prepare() error {
-	return cmd.Pipeline([]*exec.Cmd{
+	stdout, stderr, err := cmd.Pipeline([]*exec.Cmd{
 		cmd.MustConfigure(exec.Command("git", "fetch", "origin", w.branch), w.cache.inCacheDirectory()),
 		cmd.MustConfigure(exec.Command("git", "worktree", "add", w.dir, fmt.Sprintf("remotes/origin/%s", w.branch)), w.cache.inCacheDirectory()),
 		cmd.MustConfigure(exec.Command("git", "checkout", "-b", w.branch), w.inCacheDirectory()),
 	}).Run()
+	log.PrintLinesPrefixed(w.branch, stdout)
+	log.PrintLinesPrefixed(w.branch, stderr)
+	return err
 }
 
 func (w *Worker) cleanup() {
-	p := cmd.Pipeline([]*exec.Cmd{
+	stdout, stderr, err := cmd.Pipeline([]*exec.Cmd{
 		cmd.MustConfigure(exec.Command("git", "worktree", "unlock", "-b", w.branch), w.cache.inCacheDirectory()),
 		exec.Command("rm", "-fr", w.dir),
 		cmd.MustConfigure(exec.Command("git", "worktree", "prune"), w.cache.inCacheDirectory()),
-	})
-	if err := p.Run(); err != nil {
-		log.Fatal("worktree cleanup failed: %q", err)
+	}).Run()
+	log.PrintLinesPrefixed(w.branch, stdout)
+	log.PrintLinesPrefixed(w.branch, stderr)
+	if err != nil {
+		log.Fatalf("worktree cleanup failed: %q", err)
 	}
 }
 
