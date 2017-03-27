@@ -154,15 +154,33 @@ func New(token, owner, repo string) (*Cache, error) {
 
 	go func() {
 		log.Printf("master cache: %s", cache.dir)
-		cmd := exec.Command("git", "clone",
-			fmt.Sprintf("https://%s@github.com/%s/%s.git", cache.token, cache.owner, cache.repo),
-			"--branch", "master",
-			cache.dir,
-		)
-		cmd.Dir = cache.dir
-		cmd.Env = os.Environ()
-		if err := cmd.Run(); err != nil {
-			log.Fatal(err)
+		{
+			cmd := exec.Command("git", "clone",
+				fmt.Sprintf("https://%s@github.com/%s/%s.git", cache.token, cache.owner, cache.repo),
+				"--branch", "master",
+				cache.dir,
+			)
+			cmd.Dir = cache.dir
+			cmd.Env = os.Environ()
+			if err := cmd.Run(); err != nil {
+				log.Fatalf("populate for %q failed: %q", fmt.Sprintf("https://github.com/%s/%s.git", cache.owner, cache.repo), err)
+			}
+		}
+		{
+			cmd := exec.Command("git", "config", "--global", "user.email", "rebase-bot@your.domain.com")
+			cmd.Dir = cache.dir
+			cmd.Env = os.Environ()
+			if err := cmd.Run(); err != nil {
+				log.Fatalf("failed to configure global user")
+			}
+		}
+		{
+			cmd := exec.Command("git", "config", "--global", "user.name", "rebase bot")
+			cmd.Dir = cache.dir
+			cmd.Env = os.Environ()
+			if err := cmd.Run(); err != nil {
+				log.Fatalf("failed to configure global user")
+			}
 		}
 		close(cache.populate)
 	}()
