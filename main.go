@@ -25,6 +25,9 @@ var (
 func main() {
 	var publicDNS string
 	flag.StringVar(&token, "github-token", "", "auth token for GH")
+	if token == "" {
+		token = os.Getenv("GITHUB_TOKEN")
+	}
 	flag.StringVar(&owner, "owner", "", "github owner")
 	flag.StringVar(&repository, "repo", "", "github repo (owned by owner)")
 	flag.StringVar(&publicDNS, "public-dns", "", "publicly accessible dns endpoint for webhook push")
