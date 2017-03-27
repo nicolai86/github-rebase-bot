@@ -10,6 +10,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/nicolai86/github-rebase-bot/cmd"
 )
 
 type Cache struct {
@@ -23,12 +25,24 @@ type Cache struct {
 	workers  map[int]*Worker
 }
 
+func (c *Cache) inCacheDirectory() func(*exec.Cmd) {
+	return func(cmd *exec.Cmd) {
+		cmd.Dir = c.dir
+	}
+}
+
 type Worker struct {
 	cache  *Cache
 	branch string
 	prID   int
 	dir    string
 	Queue  chan chan error
+}
+
+func (w *Worker) inCacheDirectory() func(*exec.Cmd) {
+	return func(cmd *exec.Cmd) {
+		cmd.Dir = w.dir
+	}
 }
 
 func (w *Worker) rebase() (bool, error) {
@@ -53,44 +67,21 @@ func (w *Worker) push() error {
 }
 
 func (w *Worker) prepare() error {
-	{
-		cmd := exec.Command("git", "fetch", "origin", w.branch)
-		cmd.Dir = w.cache.dir
-		cmd.Env = os.Environ()
-		cmd.Run()
-	}
-	{
-		cmd := exec.Command("git", "worktree", "add", w.dir, fmt.Sprintf("remotes/origin/%s", w.branch))
-		cmd.Dir = w.cache.dir
-		cmd.Env = os.Environ()
-		cmd.Run()
-	}
-	{
-		cmd := exec.Command("git", "checkout", "-b", w.branch)
-		cmd.Dir = w.dir
-		cmd.Env = os.Environ()
-		cmd.Run()
-	}
-	return nil
+	return cmd.Pipeline([]*exec.Cmd{
+		cmd.MustConfigure(exec.Command("git", "fetch", "origin", w.branch), w.cache.inCacheDirectory()),
+		cmd.MustConfigure(exec.Command("git", "worktree", "add", w.dir, fmt.Sprintf("remotes/origin/%s", w.branch)), w.cache.inCacheDirectory()),
+		cmd.MustConfigure(exec.Command("git", "checkout", "-b", w.branch), w.inCacheDirectory()),
+	}).Run()
 }
 
 func (w *Worker) cleanup() {
-	{
-		cmd := exec.Command("git", "worktree", "unlock", "-b", w.branch)
-		cmd.Dir = w.cache.dir
-		cmd.Env = os.Environ()
-		cmd.Run()
-	}
-	{
-		cmd := exec.Command("rm", "-fr", w.dir)
-		cmd.Env = os.Environ()
-		cmd.Run()
-	}
-	{
-		cmd := exec.Command("git", "worktree", "prune")
-		cmd.Dir = w.cache.dir
-		cmd.Env = os.Environ()
-		cmd.Run()
+	p := cmd.Pipeline([]*exec.Cmd{
+		cmd.MustConfigure(exec.Command("git", "worktree", "unlock", "-b", w.branch), w.cache.inCacheDirectory()),
+		exec.Command("rm", "-fr", w.dir),
+		cmd.MustConfigure(exec.Command("git", "worktree", "prune"), w.cache.inCacheDirectory()),
+	})
+	if err := p.Run(); err != nil {
+		log.Fatal("worktree cleanup failed: %q", err)
 	}
 }
 
