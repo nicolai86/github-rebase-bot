@@ -51,6 +51,14 @@ func prHandler(client *github.Client) http.HandlerFunc {
 				continue
 			}
 
+			w, err := cache.Worker(*pr.Head.Ref, *pr.Number)
+			if err != nil {
+				log.Printf("Failed to get worker: %v", err)
+				continue
+			}
+
+			w.DeleteRemoteBranch()
+
 			fmt.Printf("merged: %v\n", result)
 		}
 	}()

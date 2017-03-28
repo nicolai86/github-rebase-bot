@@ -88,6 +88,18 @@ func (w *Worker) cleanup() {
 	}
 }
 
+// DeleteRemoteBranch allows a worker to take his assigned branch and delete the remote.
+func (w *Worker) DeleteRemoteBranch() {
+	stdout, stderr, err := cmd.Pipeline([]*exec.Cmd{
+		cmd.MustConfigure(exec.Command("git", "push", "origin", "--delete", w.branch), w.cache.inCacheDirectory()),
+	}).Run()
+	log.PrintLinesPrefixed(w.branch, stdout)
+	log.PrintLinesPrefixed(w.branch, stderr)
+	if err != nil {
+		log.Fatalf("delete remote branch failed: %q", err)
+	}
+}
+
 func (w *Worker) run() {
 	for {
 		select {
