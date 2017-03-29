@@ -50,7 +50,7 @@ func (w *Worker) prepare() error {
 	stdout, stderr, err := cmd.Pipeline([]*exec.Cmd{
 		cmd.MustConfigure(exec.Command("git", "fetch", "origin", w.branch), w.cache.inCacheDirectory()),
 		cmd.MustConfigure(exec.Command("git", "worktree", "add", w.dir, fmt.Sprintf("remotes/origin/%s", w.branch)), w.cache.inCacheDirectory()),
-		cmd.MustConfigure(exec.Command("git", "checkout", "-b", w.branch), w.inCacheDirectory()),
+		cmd.MustConfigure(exec.Command("git", "checkout", w.branch), w.inCacheDirectory()),
 	}).Run()
 	log.PrintLinesPrefixed(w.branch, stdout)
 	log.PrintLinesPrefixed(w.branch, stderr)
@@ -59,7 +59,6 @@ func (w *Worker) prepare() error {
 
 func (w *Worker) cleanup() {
 	stdout, stderr, err := cmd.Pipeline([]*exec.Cmd{
-		cmd.MustConfigure(exec.Command("git", "worktree", "unlock", "-b", w.branch), w.cache.inCacheDirectory()),
 		exec.Command("rm", "-fr", w.dir),
 		cmd.MustConfigure(exec.Command("git", "worktree", "prune"), w.cache.inCacheDirectory()),
 	}).Run()
