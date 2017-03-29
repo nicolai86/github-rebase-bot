@@ -29,10 +29,12 @@ func main() {
 	if token == "" {
 		token = os.Getenv("GITHUB_TOKEN")
 	}
+	var addr string
 	flag.StringVar(&owner, "owner", "", "github owner")
 	flag.StringVar(&repository, "repo", "", "github repo (owned by owner)")
 	flag.StringVar(&publicDNS, "public-dns", "", "publicly accessible dns endpoint for webhook push")
 	flag.StringVar(&mergeLabel, "merge-label", "", "which label is checked to kick off the merge process")
+	flag.StringVar(&addr, "addr", "", "address to listen on")
 	flag.Parse()
 
 	{
@@ -82,6 +84,6 @@ func main() {
 
 	http.HandleFunc("/events", prHandler(client))
 
-	log.Println("Listening on :8081")
-	http.ListenAndServe(":8081", nil)
+	log.Printf("Listening on %q\n", addr)
+	http.ListenAndServe(addr, nil)
 }
