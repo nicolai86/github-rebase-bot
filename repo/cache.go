@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os/exec"
+	"path"
 	"sync"
 
 	"github.com/nicolai86/github-rebase-bot/cmd"
@@ -13,12 +14,8 @@ import (
 // Cache manages the checkout of a github repository as well as the master branch.
 // Additionally a cache manages all workers connected to this particular checkout
 type Cache struct {
-	token  string
-	owner  string
-	repo   string
-	branch string
-	dir    string
-	mu     sync.Mutex
+	dir string
+	mu  sync.Mutex
 
 	workers map[int]*Worker
 }
@@ -27,25 +24,6 @@ func (c *Cache) inCacheDirectory() func(*exec.Cmd) {
 	return func(cmd *exec.Cmd) {
 		cmd.Dir = c.dir
 	}
-}
-
-// New returns a new cache and starts a checkout in the background
-func New(token, owner, repo, branch string) (*Cache, error) {
-	dir, err := ioutil.TempDir("", fmt.Sprintf("%s-%s-master", owner, repo))
-	if err != nil {
-		return nil, err
-	}
-
-	cache := &Cache{
-		token:   token,
-		owner:   owner,
-		repo:    repo,
-		branch:  branch,
-		dir:     dir,
-		workers: make(map[int]*Worker),
-	}
-
-	return cache, nil
 }
 
 func (c *Cache) update() error {
@@ -68,16 +46,28 @@ func (c *Cache) remove(w *Worker) {
 	delete(c.workers, w.prID)
 }
 
-// Prepare clones the given branch from github
-func (c *Cache) Prepare() error {
-	return exec.Command(
+// Prepare clones the given branch from github and returns a Cache
+func Prepare(token, owner, repo, branch string) (*Cache, error) {
+	dir, err := ioutil.TempDir("", fmt.Sprintf("%s-%s-master", owner, repo))
+	if err != nil {
+		return nil, err
+	}
+
+	if err := exec.Command(
 		"git",
 		"clone",
-		fmt.Sprintf("https://%s@github.com/%s/%s.git", c.token, c.owner, c.repo),
+		fmt.Sprintf("https://%s@github.com/%s/%s.git", token, owner, repo),
 		"--branch",
-		c.branch,
-		c.dir,
-	).Run()
+		branch,
+		dir,
+	).Run(); err != nil {
+		return nil, err
+	}
+
+	return &Cache{
+		dir:     dir,
+		workers: make(map[int]*Worker),
+	}, nil
 }
 
 // Worker manages workers for branches. By default a worker runs in its own
@@ -88,7 +78,7 @@ func (c *Cache) Worker(branch string, pr int) (*Worker, error) {
 		return w, nil
 	}
 
-	dir, err := ioutil.TempDir("", fmt.Sprintf("%s-%s-%d", c.owner, c.repo, pr))
+	dir, err := ioutil.TempDir("", fmt.Sprintf("%s-%d", path.Base(c.dir), pr))
 	if err != nil {
 		return nil, err
 	}
