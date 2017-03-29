@@ -11,6 +11,7 @@ import (
 	"os/signal"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/google/go-github/github"
 	"github.com/nicolai86/github-rebase-bot/repo"
@@ -75,6 +76,22 @@ func main() {
 		cache = c
 	}
 
+	// On ^C, or SIGTERM handle exit.
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt)
+	signal.Notify(c, syscall.SIGTERM)
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/events", prHandler(client))
+	srv := &http.Server{
+		Addr:    addr,
+		Handler: mux,
+	}
+	log.Printf("Listening on %q\n", addr)
+	go func() {
+		srv.ListenAndServe()
+	}()
+
 	var h *github.Hook
 	if publicDNS != "" {
 		h, err = registerHook(client, publicDNS, owner, repository)
@@ -83,24 +100,16 @@ func main() {
 		}
 	}
 
-	// On ^C, or SIGTERM handle exit.
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt)
-	signal.Notify(c, syscall.SIGTERM)
-	go func() {
-		for sig := range c {
-			log.Printf("Received %s, exiting.", sig.String())
-			if h != nil {
-				client.Repositories.DeleteHook(context.Background(), owner, repository, *h.ID)
-			}
-			os.Exit(0)
-		}
-	}()
+	sig := <-c
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	srv.Shutdown(ctx)
+	cancel()
+	log.Printf("Received %s, exiting.", sig.String())
+	if h != nil {
+		client.Repositories.DeleteHook(context.Background(), owner, repository, *h.ID)
+	}
+	os.Exit(0)
 
-	http.HandleFunc("/events", prHandler(client))
-
-	log.Printf("Listening on %q\n", addr)
-	http.ListenAndServe(addr, nil)
 }
 
 func createHook(client *github.Client, publicDNS, owner, repo string) (*github.Hook, error) {
