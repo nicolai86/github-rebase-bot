@@ -13,14 +13,14 @@ import (
 // Cache manages the checkout of a github repository as well as the master branch.
 // Additionally a cache manages all workers connected to this particular checkout
 type Cache struct {
-	token string
-	owner string
-	repo  string
-	dir   string
-	mu    sync.Mutex
+	token  string
+	owner  string
+	repo   string
+	branch string
+	dir    string
+	mu     sync.Mutex
 
-	populate chan struct{}
-	workers  map[int]*Worker
+	workers map[int]*Worker
 }
 
 func (c *Cache) inCacheDirectory() func(*exec.Cmd) {
@@ -30,33 +30,20 @@ func (c *Cache) inCacheDirectory() func(*exec.Cmd) {
 }
 
 // New returns a new cache and starts a checkout in the background
-func New(token, owner, repo string) (*Cache, error) {
+func New(token, owner, repo, branch string) (*Cache, error) {
 	dir, err := ioutil.TempDir("", fmt.Sprintf("%s-%s-master", owner, repo))
 	if err != nil {
 		return nil, err
 	}
 
 	cache := &Cache{
-		token:    token,
-		owner:    owner,
-		repo:     repo,
-		dir:      dir,
-		populate: make(chan struct{}),
-		workers:  make(map[int]*Worker),
+		token:   token,
+		owner:   owner,
+		repo:    repo,
+		branch:  branch,
+		dir:     dir,
+		workers: make(map[int]*Worker),
 	}
-
-	go func() {
-		log.Printf("master cache: %s", cache.dir)
-		stdout, stderr, err := cmd.Pipeline([]*exec.Cmd{
-			exec.Command("git", "clone", fmt.Sprintf("https://%s@github.com/%s/%s.git", cache.token, cache.owner, cache.repo), "--branch", "master", cache.dir),
-		}).Run()
-		log.PrintLinesPrefixed("master", stdout)
-		log.PrintLinesPrefixed("master", stderr)
-		if err != nil {
-			log.Fatalf("Failed to setup cache for master: %q", err)
-		}
-		close(cache.populate)
-	}()
 
 	return cache, nil
 }
@@ -81,11 +68,21 @@ func (c *Cache) remove(w *Worker) {
 	delete(c.workers, w.prID)
 }
 
+// Prepare clones the given branch from github
+func (c *Cache) Prepare() error {
+	return exec.Command(
+		"git",
+		"clone",
+		fmt.Sprintf("https://%s@github.com/%s/%s.git", c.token, c.owner, c.repo),
+		"--branch",
+		c.branch,
+		c.dir,
+	).Run()
+}
+
 // Worker manages workers for branches. By default a worker runs in its own
 // goroutine and is re-used if the same branch is requested multiple times
 func (c *Cache) Worker(branch string, pr int) (*Worker, error) {
-	<-c.Wait()
-
 	w, ok := c.workers[pr]
 	if ok {
 		return w, nil
@@ -109,9 +106,4 @@ func (c *Cache) Worker(branch string, pr int) (*Worker, error) {
 	}
 	go w.run()
 	return w, nil
-}
-
-// Wait can be used as a synchronization primitive to ensure that the cache is ready to serve as a data source
-func (c *Cache) Wait() <-chan struct{} {
-	return c.populate
 }

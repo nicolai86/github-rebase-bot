@@ -48,10 +48,11 @@ func main() {
 	}
 
 	{
-		c, err := repo.New(token, owner, repository)
+		c, err := repo.New(token, owner, repository, "master")
 		if err != nil {
 			log.Fatal(err)
 		}
+		c.Prepare()
 		cache = c
 	}
 

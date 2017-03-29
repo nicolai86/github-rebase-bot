@@ -61,7 +61,6 @@ func prHandler(client *github.Client) http.HandlerFunc {
 
 	// process LGTM'd pull requests: rebase if necessary. can run in parallel. Can run in parallel
 	go func() {
-		<-cache.Wait()
 		log.Printf("rebase queue: started")
 
 		for {
