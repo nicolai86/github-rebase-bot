@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/exec"
 	"os/signal"
 	"strings"
 	"syscall"
@@ -38,6 +39,13 @@ func main() {
 	flag.StringVar(&mergeLabel, "merge-label", "", "which label is checked to kick off the merge process")
 	flag.StringVar(&addr, "addr", "", "address to listen on")
 	flag.Parse()
+
+	if err := exec.Command("git", "config", "--global", "user.name", "rebase bot").Run(); err != nil {
+		log.Fatal("git config --global user.name failed: %q", err)
+	}
+	if err := exec.Command("git", "config", "--global", "user.email", "rebase-bot@your.domain.com").Run(); err != nil {
+		log.Fatal("git config --global user.email failed: %q", err)
+	}
 
 	{
 		c, err := repo.New(token, owner, repository)

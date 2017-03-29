@@ -49,8 +49,6 @@ func New(token, owner, repo string) (*Cache, error) {
 		log.Printf("master cache: %s", cache.dir)
 		stdout, stderr, err := cmd.Pipeline([]*exec.Cmd{
 			exec.Command("git", "clone", fmt.Sprintf("https://%s@github.com/%s/%s.git", cache.token, cache.owner, cache.repo), "--branch", "master", cache.dir),
-			exec.Command("git", "config", "--global", "user.email", "rebase-bot@your.domain.com"),
-			exec.Command("git", "config", "--global", "user.name", "rebase bot"),
 		}).Run()
 		log.PrintLinesPrefixed("master", stdout)
 		log.PrintLinesPrefixed("master", stderr)
