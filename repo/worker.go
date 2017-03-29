@@ -48,7 +48,6 @@ func (w *Worker) push() error {
 
 func (w *Worker) prepare() error {
 	stdout, stderr, err := cmd.Pipeline([]*exec.Cmd{
-		cmd.MustConfigure(exec.Command("git", "fetch", "origin", w.branch), w.cache.inCacheDirectory()),
 		cmd.MustConfigure(exec.Command("git", "worktree", "add", w.dir, fmt.Sprintf("remotes/origin/%s", w.branch)), w.cache.inCacheDirectory()),
 		cmd.MustConfigure(exec.Command("git", "checkout", w.branch), w.inCacheDirectory()),
 	}).Run()
@@ -73,10 +72,14 @@ func (w *Worker) run() {
 	for {
 		select {
 		case ch := <-w.Queue:
-			w.prepare()
 			if err := w.cache.update(); err != nil {
 				log.Printf("failed to update master: %v", err)
-				w.cleanup()
+				ch <- err
+				close(ch)
+				continue
+			}
+			if err := w.prepare(); err != nil {
+				log.Printf("failed to prepare worktree: %v", err)
 				ch <- err
 				close(ch)
 				continue
