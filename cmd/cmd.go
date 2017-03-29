@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"fmt"
 	"os/exec"
 )
 
@@ -22,6 +23,7 @@ func (p Pipeline) Run() (string, string, error) {
 	for _, cmd := range p {
 		cmd.Stdout = &stdout
 		cmd.Stderr = &stderr
+		stdout.WriteString(fmt.Sprintf("Executing %s\n", cmd.Args))
 		if err := cmd.Run(); err != nil {
 			return stdout.String(), stderr.String(), err
 		}
