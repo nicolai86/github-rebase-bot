@@ -51,6 +51,8 @@ func prHandler(client *github.Client) http.HandlerFunc {
 				continue
 			}
 
+			client.Git.DeleteRef(context.Background(), owner, repository, *pr.Head.Ref)
+
 			fmt.Printf("merged: %v\n", result)
 		}
 	}()
