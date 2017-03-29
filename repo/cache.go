@@ -3,6 +3,7 @@ package repo
 import (
 	"fmt"
 	"io/ioutil"
+	"os"
 	"os/exec"
 	"path"
 	"sync"
@@ -53,14 +54,17 @@ func Prepare(token, owner, repo, branch string) (*Cache, error) {
 		return nil, err
 	}
 
-	if err := exec.Command(
+	cmd := exec.Command(
 		"git",
 		"clone",
 		fmt.Sprintf("https://%s@github.com/%s/%s.git", token, owner, repo),
 		"--branch",
 		branch,
 		dir,
-	).Run(); err != nil {
+	)
+	cmd.Stderr = os.Stderr
+	cmd.Stdout = os.Stdout
+	if err := cmd.Run(); err != nil {
 		return nil, err
 	}
 
@@ -70,26 +74,48 @@ func Prepare(token, owner, repo, branch string) (*Cache, error) {
 	}, nil
 }
 
+func (c *Cache) Cleanup(id int) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	w, ok := c.workers[id]
+	if !ok {
+		return nil
+	}
+	stdout, stderr, err := cmd.Pipeline([]*exec.Cmd{
+		exec.Command("rm", "-fr", w.dir),
+		cmd.MustConfigure(exec.Command("git", "worktree", "prune"), c.inCacheDirectory()),
+	}).Run()
+	log.PrintLinesPrefixed(w.branch, stdout)
+	log.PrintLinesPrefixed(w.branch, stderr)
+	if err != nil {
+		log.Printf("worktree cleanup failed: %q", err)
+	}
+	delete(c.workers, id)
+	return nil
+}
+
 // Worker manages workers for branches. By default a worker runs in its own
 // goroutine and is re-used if the same branch is requested multiple times
-func (c *Cache) Worker(branch string, pr int) (*Worker, error) {
-	w, ok := c.workers[pr]
+func (c *Cache) Worker(branch string, id int) (*Worker, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	w, ok := c.workers[id]
 	if ok {
 		return w, nil
 	}
 
-	dir, err := ioutil.TempDir("", fmt.Sprintf("%s-%d", path.Base(c.dir), pr))
+	dir, err := ioutil.TempDir("", fmt.Sprintf("%s-%d", path.Base(c.dir), id))
 	if err != nil {
 		return nil, err
 	}
 	w = &Worker{
 		branch: branch,
-		prID:   pr,
+		prID:   id,
 		dir:    dir,
 		cache:  c,
 		Queue:  make(chan chan error),
 	}
-	c.workers[pr] = w
+	c.workers[id] = w
 	if err := w.prepare(); err != nil {
 		log.Printf("Preparing worktree failed: %#v", err)
 		return nil, err

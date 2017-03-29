@@ -40,19 +40,8 @@ func main() {
 	flag.StringVar(&addr, "addr", "", "address to listen on")
 	flag.Parse()
 
-	if err := exec.Command("git", "config", "--global", "user.name", "rebase bot").Run(); err != nil {
-		log.Fatal("git config --global user.name failed: %q", err)
-	}
-	if err := exec.Command("git", "config", "--global", "user.email", "rebase-bot@your.domain.com").Run(); err != nil {
-		log.Fatal("git config --global user.email failed: %q", err)
-	}
-
-	{
-		c, err := repo.Prepare(token, owner, repository, "master")
-		if err != nil {
-			log.Fatal(err)
-		}
-		cache = c
+	if token == "" {
+		log.Fatal("Missing github token.")
 	}
 
 	ts := oauth2.StaticTokenSource(
@@ -64,12 +53,27 @@ func main() {
 
 	user, _, err := client.Users.Get(context.Background(), "")
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("resolving github user failed: %v", err)
 	}
 	username := *user.Login
 
 	log.Printf("Bot started for user %s.\n", username)
 	log.Printf("Using %q as merge-label.\n", mergeLabel)
+
+	if err := exec.Command("git", "config", "--global", "user.name", "rebase bot").Run(); err != nil {
+		log.Fatal("git config --global user.name failed: %q", err)
+	}
+	if err := exec.Command("git", "config", "--global", "user.email", "rebase-bot@your.domain.com").Run(); err != nil {
+		log.Fatal("git config --global user.email failed: %q", err)
+	}
+
+	{
+		c, err := repo.Prepare(token, owner, repository, "master")
+		if err != nil {
+			log.Fatalf("prepare failed: %v", err)
+		}
+		cache = c
+	}
 
 	var h *github.Hook
 	if publicDNS != "" {

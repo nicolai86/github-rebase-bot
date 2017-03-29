@@ -96,6 +96,7 @@ func prHandler(client *github.Client) http.HandlerFunc {
 			log.Printf("processing PR #%d", *pr.Number)
 			if *pr.State != "open" {
 				log.Printf("PR is not open")
+				cache.Cleanup(*pr.Number)
 				continue
 			}
 

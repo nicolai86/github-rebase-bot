@@ -56,16 +56,14 @@ func (w *Worker) prepare() error {
 	return err
 }
 
-func (w *Worker) cleanup() {
+func (w *Worker) update() error {
 	stdout, stderr, err := cmd.Pipeline([]*exec.Cmd{
-		exec.Command("rm", "-fr", w.dir),
-		cmd.MustConfigure(exec.Command("git", "worktree", "prune"), w.cache.inCacheDirectory()),
+		cmd.MustConfigure(exec.Command("git", "fetch", "origin", w.branch), w.inCacheDirectory()),
+		cmd.MustConfigure(exec.Command("git", "reset", "--hard", fmt.Sprintf("origin/%s", w.branch)), w.inCacheDirectory()),
 	}).Run()
 	log.PrintLinesPrefixed(w.branch, stdout)
 	log.PrintLinesPrefixed(w.branch, stderr)
-	if err != nil {
-		log.Fatalf("worktree cleanup failed: %q", err)
-	}
+	return err
 }
 
 func (w *Worker) run() {
@@ -78,8 +76,8 @@ func (w *Worker) run() {
 				close(ch)
 				continue
 			}
-			if err := w.prepare(); err != nil {
-				log.Printf("failed to prepare worktree: %v", err)
+			if err := w.update(); err != nil {
+				log.Printf("failed to update worktree: %v", err)
 				ch <- err
 				close(ch)
 				continue
@@ -88,7 +86,6 @@ func (w *Worker) run() {
 			changed, err := w.rebase()
 			if err != nil {
 				log.Printf("failed to rebase master: %v", err)
-				w.cleanup()
 				ch <- err
 				close(ch)
 				continue
@@ -96,20 +93,17 @@ func (w *Worker) run() {
 			if changed {
 				if err := w.push(); err != nil {
 					log.Printf("failed to push branch: %v", err)
-					w.cleanup()
 					ch <- err
 					continue
 				}
-				w.cleanup()
 				close(ch)
 			} else {
-				w.cleanup()
 				close(ch)
 				log.Printf("up2date")
 			}
-		case <-time.After(24 * 7 * time.Hour):
+		case <-time.After(24 * time.Hour):
 			log.Printf("shutdown")
-			w.cache.remove(w)
+			w.cache.Cleanup(w.prID)
 			return
 		}
 	}
