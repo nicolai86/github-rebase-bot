@@ -58,7 +58,8 @@ func main() {
 	}
 	username := *user.Login
 
-	log.Printf("Bot started for user %s.", username)
+	log.Printf("Bot started for user %s.\n", username)
+	log.Printf("Using %q as merge-label.\n", mergeLabel)
 
 	var h *github.Hook
 	if publicDNS != "" {
