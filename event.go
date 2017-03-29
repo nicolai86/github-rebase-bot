@@ -51,7 +51,7 @@ func prHandler(client *github.Client) http.HandlerFunc {
 				continue
 			}
 
-			if _, err := client.Git.DeleteRef(context.Background(), owner, repository, *pr.Head.Ref); err != nil {
+			if _, err := client.Git.DeleteRef(context.Background(), owner, repository, fmt.Sprintf("heads/%s", *pr.Head.Ref)); err != nil {
 				fmt.Printf("Failed deleting branch: %q\n", err)
 			}
 
