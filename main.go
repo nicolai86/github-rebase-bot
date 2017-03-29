@@ -18,6 +18,7 @@ var (
 	token      string
 	owner      string
 	repository string
+	mergeLabel string
 
 	cache *repo.Cache
 )
@@ -31,6 +32,7 @@ func main() {
 	flag.StringVar(&owner, "owner", "", "github owner")
 	flag.StringVar(&repository, "repo", "", "github repo (owned by owner)")
 	flag.StringVar(&publicDNS, "public-dns", "", "publicly accessible dns endpoint for webhook push")
+	flag.StringVar(&mergeLabel, "merge-label", "", "which label is checked to kick off the merge process")
 	flag.Parse()
 
 	{

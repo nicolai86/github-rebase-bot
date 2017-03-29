@@ -108,12 +108,12 @@ func prHandler(client *github.Client) http.HandlerFunc {
 				continue
 			}
 
-			isLGTM := false
+			mergeable := false
 			for _, label := range issue.Labels {
-				isLGTM = isLGTM || *label.Name == "LGTM"
+				mergeable = mergeable || *label.Name == mergeLabel
 			}
-			if !isLGTM {
-				log.Printf("Not LGTM")
+			if !mergeable {
+				log.Printf("Not marked as ready to merge")
 				continue
 			}
 
