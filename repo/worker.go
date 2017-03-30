@@ -17,7 +17,7 @@ type Worker struct {
 	branch string
 	prID   int
 	dir    string
-	Queue  chan chan error
+	Queue  chan chan Signal
 }
 
 func (w *Worker) inCacheDirectory() func(*exec.Cmd) {
@@ -35,8 +35,7 @@ func (w *Worker) rebase() (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	up2date := strings.Contains(stdout, "is up to date")
-	return !up2date, nil
+	return strings.Contains(stdout, "is up to date"), nil
 }
 
 func (w *Worker) push() error {
@@ -70,37 +69,54 @@ func (w *Worker) run() {
 	for {
 		select {
 		case ch := <-w.Queue:
-			if err := w.cache.update(); err != nil {
-				log.Printf("failed to update master: %v", err)
-				ch <- err
-				close(ch)
-				continue
-			}
-			if err := w.update(); err != nil {
-				log.Printf("failed to update worktree: %v", err)
-				ch <- err
-				close(ch)
-				continue
-			}
-			log.Printf("rebasing…")
-			changed, err := w.rebase()
-			if err != nil {
-				log.Printf("failed to rebase master: %v", err)
-				ch <- err
-				close(ch)
-				continue
-			}
-			if changed {
-				if err := w.push(); err != nil {
-					log.Printf("failed to push branch: %v", err)
-					ch <- err
-					continue
+			func(ch chan Signal) {
+				rev, err := w.cache.update()
+				if err != nil {
+					log.Printf("failed to update master: %v", err)
+					ch <- Signal{Error: err}
+					close(ch)
+					return
 				}
+
+				if err := w.update(); err != nil {
+					log.Printf("failed to update worktree: %v", err)
+					ch <- Signal{Error: err}
+					close(ch)
+					return
+				}
+
+				log.Printf("rebasing…")
+				up2date, err := w.rebase()
+				if err != nil {
+					log.Printf("failed to rebase master: %v", err)
+					ch <- Signal{Error: err}
+					close(ch)
+					return
+				}
+
+				if !up2date {
+					if err := w.push(); err != nil {
+						log.Printf("failed to push branch: %v", err)
+						ch <- Signal{Error: err}
+						close(ch)
+						return
+					}
+
+					ch <- Signal{Error: nil, UpToDate: false}
+					close(ch)
+					return
+				}
+
+				// if master changed, re-try
+				rev2, _ := w.cache.update()
+				if rev != rev2 {
+					w.Queue <- ch
+					return
+				}
+
+				ch <- Signal{Error: err, UpToDate: true}
 				close(ch)
-			} else {
-				close(ch)
-				log.Printf("up2date")
-			}
+			}(ch)
 		case <-time.After(24 * time.Hour):
 			log.Printf("shutdown")
 			w.cache.Cleanup(w.prID)

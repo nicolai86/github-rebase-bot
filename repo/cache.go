@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"strings"
 	"sync"
 
 	"github.com/nicolai86/github-rebase-bot/cmd"
@@ -27,20 +28,24 @@ func (c *Cache) inCacheDirectory() func(*exec.Cmd) {
 	}
 }
 
-func (c *Cache) update() error {
+func (c *Cache) update() (string, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	stdout, stderr, err := cmd.Pipeline([]*exec.Cmd{
 		cmd.MustConfigure(exec.Command("git", "fetch", "--all"), c.inCacheDirectory()),
 		cmd.MustConfigure(exec.Command("git", "reset", "--hard", "origin/master"), c.inCacheDirectory()),
+		cmd.MustConfigure(exec.Command("git", "rev-parse", "HEAD"), c.inCacheDirectory()),
 	}).Run()
 	log.PrintLinesPrefixed("master", stdout)
 	log.PrintLinesPrefixed("master", stderr)
 	if err != nil {
 		log.Fatalf("Failed to update cache for master: %q", err)
 	}
-	return nil
+
+	lines := strings.Split(stdout, "\n")
+	rev := lines[len(lines)-2]
+	return rev, nil
 }
 
 func (c *Cache) remove(w *Worker) {
@@ -113,7 +118,7 @@ func (c *Cache) Worker(branch string, id int) (*Worker, error) {
 		prID:   id,
 		dir:    dir,
 		cache:  c,
-		Queue:  make(chan chan error),
+		Queue:  make(chan chan Signal),
 	}
 	c.workers[id] = w
 	if err := w.prepare(); err != nil {

@@ -108,8 +108,6 @@ func main() {
 	if h != nil {
 		client.Repositories.DeleteHook(context.Background(), owner, repository, *h.ID)
 	}
-	os.Exit(0)
-
 }
 
 func createHook(client *github.Client, publicDNS, owner, repo string) (*github.Hook, error) {

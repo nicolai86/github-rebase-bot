@@ -8,6 +8,7 @@ import (
 	"net/http"
 
 	"github.com/google/go-github/github"
+	"github.com/nicolai86/github-rebase-bot/repo"
 )
 
 func prHandler(client *github.Client) http.HandlerFunc {
@@ -77,11 +78,11 @@ func prHandler(client *github.Client) http.HandlerFunc {
 				log.Printf("Failed to get worker: %v", err)
 				continue
 			}
-			c := make(chan error)
+			c := make(chan repo.Signal)
 			w.Queue <- c
 			go func(pr *github.PullRequest) {
-				err := <-c
-				if err == nil {
+				sig := <-c
+				if sig.UpToDate && sig.Error == nil {
 					mergeQueue <- pr
 				}
 			}(pr)
