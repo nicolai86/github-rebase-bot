@@ -11,71 +11,26 @@ import (
 	"github.com/nicolai86/github-rebase-bot/repo"
 )
 
-func prHandler(client *github.Client) http.HandlerFunc {
-	var mergeQueue = make(chan *github.PullRequest)
-	var rebaseQueue = make(chan int, 100)
-	var issueQueue = make(chan *github.IssuesEvent, 100)
-	var prQueue = make(chan *github.PullRequest, 100)
-	var statusQueue = make(chan *github.StatusEvent, 100)
-
-	// process rebased, successful pull requests. merge if possible (tests green, mergeable)
+func processPullRequestReviewEvent(client *github.Client, input <-chan *github.PullRequestReviewEvent) <-chan *github.PullRequest {
+	ret := make(chan *github.PullRequest)
 	go func() {
-		log.Printf("merge queue: started")
-
-		for {
-			pr := <-mergeQueue
-
-			status, _, err := client.Repositories.GetCombinedStatus(context.Background(), owner, repository, *pr.Head.SHA, &github.ListOptions{})
-			if err != nil {
-				continue
-			}
-
-			log.Printf("status for %q (%q): %q\n", *pr.Head.Ref, *pr.Head.SHA, *status.State)
-			if *status.State != "success" {
-				continue
-			}
-
-			if !*pr.Mergeable {
-				continue
-			}
-
-			result, _, err := client.PullRequests.Merge(
-				context.Background(),
-				owner,
-				repository,
-				*pr.Number,
-				"merge-bot merged",
-				&github.PullRequestOptions{
-					MergeMethod: "merge",
-				})
-			if err != nil {
-				continue
-			}
-
-			if _, err := client.Git.DeleteRef(context.Background(), owner, repository, fmt.Sprintf("heads/%s", *pr.Head.Ref)); err != nil {
-				fmt.Printf("Failed deleting branch: %q\n", err)
-			}
-
-			fmt.Printf("merged: %v\n", result)
+		for evt := range input {
+			ret <- evt.PullRequest
 		}
+		close(ret)
 	}()
+	return ret
+}
 
-	// process LGTM'd pull requests: rebase if necessary. can run in parallel. Can run in parallel
+func processRebase(client *github.Client, input <-chan *github.PullRequest) <-chan *github.PullRequest {
+	ret := make(chan *github.PullRequest)
 	go func() {
-		log.Printf("rebase queue: started")
-
-		for {
-			prID := <-rebaseQueue
-			log.Printf("processing rebase PR #%d", prID)
-			pr, _, err := client.PullRequests.Get(context.Background(), owner, repository, prID)
+		for pr := range input {
+			w, err := cache.Worker(
+				pr.Head.GetRef(),
+				pr.GetNumber(),
+			)
 			if err != nil {
-				log.Printf("Failed to fetch PR: %v", err)
-				continue
-			}
-
-			w, err := cache.Worker(*pr.Head.Ref, prID)
-			if err != nil {
-				log.Printf("Failed to get worker: %v", err)
 				continue
 			}
 			c := make(chan repo.Signal)
@@ -83,91 +38,72 @@ func prHandler(client *github.Client) http.HandlerFunc {
 			go func(pr *github.PullRequest) {
 				sig := <-c
 				if sig.UpToDate && sig.Error == nil {
-					mergeQueue <- pr
+					ret <- pr
 				}
 			}(pr)
 		}
+		close(ret)
 	}()
+	return ret
+}
 
-	// process pull request candidates; only LGTM'd pull requests proceed
+func processMerge(client *github.Client, input <-chan *github.PullRequest) <-chan *github.PullRequest {
+	ret := make(chan *github.PullRequest)
 	go func() {
-		log.Printf("lgtm queue: started")
-		for {
-			pr := <-prQueue
-			log.Printf("processing PR #%d", *pr.Number)
-			if *pr.State != "open" {
-				log.Printf("PR is not open")
-				cache.Cleanup(*pr.Number)
+		for pr := range input {
+			if _, _, err := client.PullRequests.Merge(
+				context.Background(),
+				owner,
+				repository,
+				pr.GetNumber(),
+				"merge-bot merged",
+				&github.PullRequestOptions{
+					MergeMethod: "merge",
+				}); err != nil {
 				continue
 			}
 
-			issue, _, err := client.Issues.Get(context.Background(), owner, repository, *pr.Number)
-			if err != nil {
-				log.Printf("unable to fetch issues: %v", err)
-				continue
+			if _, err := client.Git.DeleteRef(
+				context.Background(),
+				owner,
+				repository,
+				fmt.Sprintf("heads/%s", *pr.Head.Ref),
+			); err != nil {
+				fmt.Printf("Failed deleting branch: %q\n", err)
 			}
 
-			if len(issue.Labels) == 0 {
-				client.Issues.AddLabelsToIssue(context.Background(), owner, repository, *pr.Number, []string{"WIP"})
-				log.Printf("Added WIP label")
-				continue
-			}
-
-			mergeable := false
-			for _, label := range issue.Labels {
-				mergeable = mergeable || *label.Name == mergeLabel
-			}
-			if !mergeable {
-				log.Printf("Not marked as ready to merge")
-				continue
-			}
-
-			rebaseQueue <- *pr.Number
+			ret <- pr
 		}
+		close(ret)
 	}()
+	return ret
+}
 
-	// if an issue event references an active pull request put the pull request onto the merge queue
+func prHandler(client *github.Client) http.HandlerFunc {
+	issueQueue := make(chan *github.IssuesEvent, 100)
+	prQueue := make(chan *github.PullRequest, 100)
+	reviewQueue := make(chan *github.PullRequestReviewEvent, 100)
+	statusQueue := make(chan *github.StatusEvent, 100)
+
+	// rebase queue contains pull requests which are:
+	//  - open
+	//  - green
+	//  - marked with mergeLabel
+	//  - mergeable
+	rebaseQueue := processPullRequest(client.Issues, client.Repositories, mergeLabel, merge(
+		prQueue,
+		processIssuesEvent(client.PullRequests, issueQueue),
+		processStatusEvent(client.PullRequests, statusQueue),
+		processPullRequestReviewEvent(client, reviewQueue),
+	))
+
+	doneQueue := processMerge(client,
+		processRebase(client, rebaseQueue),
+	)
+
 	go func() {
-		for {
-			evt := <-issueQueue
-
-			pr, _, err := client.PullRequests.Get(context.Background(), owner, repository, *evt.Issue.Number)
-			if err != nil {
-				continue
-			}
-
-			prQueue <- pr
-		}
-	}()
-
-	// if a status event references an active pull request put the pull request onto the merge queue
-	go func() {
-		for {
-			evt := <-statusQueue
-
-			prs, _, err := client.PullRequests.List(context.Background(), owner, repository, &github.PullRequestListOptions{
-				State: "open",
-			})
-			if err != nil {
-				log.Printf("failed to list PRs: %#v", err)
-				continue
-			}
-			var pr *github.PullRequest
-			for _, branch := range evt.Branches {
-				for _, p := range prs {
-					if *p.Head.Ref == *branch.Name {
-						pr = p
-						break
-					}
-				}
-				if pr != nil {
-					break
-				}
-			}
-
-			if pr != nil {
-				prQueue <- pr
-			}
+		for pr := range doneQueue {
+			fmt.Printf("merged PR #%d\n", *pr.Number)
 		}
 	}()
 
@@ -179,11 +115,15 @@ func prHandler(client *github.Client) http.HandlerFunc {
 			json.NewDecoder(r.Body).Decode(evt)
 
 			prQueue <- evt.PullRequest
+
+			if evt.PullRequest.GetState() == "closed" {
+				cache.Cleanup(*evt.PullRequest.Number)
+			}
 		} else if eventType == "pull_request_review" {
 			evt := new(github.PullRequestReviewEvent)
 			json.NewDecoder(r.Body).Decode(evt)
 
-			prQueue <- evt.PullRequest
+			reviewQueue <- evt
 		} else if eventType == "issues" {
 			evt := new(github.IssuesEvent)
 			json.NewDecoder(r.Body).Decode(evt)

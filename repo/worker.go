@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nicolai86/github-rebase-bot/cmd"
 	"github.com/nicolai86/github-rebase-bot/log"
+	"github.com/nicolai86/github-rebase-bot/repo/internal/cmd"
 )
 
 // Worker manages a single branch for a repository
