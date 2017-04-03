@@ -9,10 +9,14 @@ import (
 	"github.com/nicolai86/github-rebase-bot/repo"
 )
 
-type fakeWorkerCache func(string, int) (repo.Enqueuer, error)
+type fakeWorkerCache func(string) (repo.Enqueuer, error)
 
-func (f fakeWorkerCache) Worker(branch string, id int) (repo.Enqueuer, error) {
-	return f(branch, id)
+func (f fakeWorkerCache) Worker(branch string) (repo.Enqueuer, error) {
+	return f(branch)
+}
+
+func (f fakeWorkerCache) Update() (string, error) {
+	return "", nil
 }
 
 type fakeEnqueuer func() repo.Signal
@@ -29,10 +33,10 @@ func TestProcessRebase(t *testing.T) {
 		prNumber := 2202
 		var wg sync.WaitGroup
 		wg.Add(1)
-		processRebase(fakeWorkerCache(func(branch string, id int) (repo.Enqueuer, error) {
+		processRebase(fakeWorkerCache(func(branch string) (repo.Enqueuer, error) {
 			wg.Done()
-			if prBranch != branch || id != prNumber {
-				t.Fatalf("Expected branch %q and id %d, but got %q and %d", prBranch, prNumber, branch, id)
+			if prBranch != branch {
+				t.Fatalf("Expected branch %q but got %q ", prBranch, branch)
 			}
 			return nil, errors.New("failed to checkout repo")
 		}), ch)
@@ -48,7 +52,7 @@ func TestProcessRebase(t *testing.T) {
 
 	t.Run("filters when worker fetching errors", func(t *testing.T) {
 		ch := make(chan *github.PullRequest)
-		ret := processRebase(fakeWorkerCache(func(_ string, _ int) (repo.Enqueuer, error) {
+		ret := processRebase(fakeWorkerCache(func(_ string) (repo.Enqueuer, error) {
 			return nil, errors.New("failed to checkout repo")
 		}), ch)
 		ch <- &github.PullRequest{}
@@ -60,7 +64,7 @@ func TestProcessRebase(t *testing.T) {
 
 	t.Run("filters rebased branches", func(t *testing.T) {
 		ch := make(chan *github.PullRequest)
-		ret := processRebase(fakeWorkerCache(func(branch string, id int) (repo.Enqueuer, error) {
+		ret := processRebase(fakeWorkerCache(func(branch string) (repo.Enqueuer, error) {
 			return fakeEnqueuer(func() repo.Signal { return repo.Signal{UpToDate: false} }), nil
 		}), ch)
 		ch <- &github.PullRequest{}
@@ -72,7 +76,7 @@ func TestProcessRebase(t *testing.T) {
 
 	t.Run("filters error'd branches", func(t *testing.T) {
 		ch := make(chan *github.PullRequest)
-		ret := processRebase(fakeWorkerCache(func(branch string, id int) (repo.Enqueuer, error) {
+		ret := processRebase(fakeWorkerCache(func(branch string) (repo.Enqueuer, error) {
 			return fakeEnqueuer(func() repo.Signal { return repo.Signal{Error: errors.New("git: unknown binary")} }), nil
 		}), ch)
 		ch <- &github.PullRequest{}
@@ -84,7 +88,7 @@ func TestProcessRebase(t *testing.T) {
 
 	t.Run("passes through up2date branches", func(t *testing.T) {
 		ch := make(chan *github.PullRequest)
-		ret := processRebase(fakeWorkerCache(func(branch string, id int) (repo.Enqueuer, error) {
+		ret := processRebase(fakeWorkerCache(func(branch string) (repo.Enqueuer, error) {
 			return fakeEnqueuer(func() repo.Signal { return repo.Signal{UpToDate: true} }), nil
 		}), ch)
 		ch <- &github.PullRequest{}

@@ -69,7 +69,8 @@ func main() {
 	}
 
 	{
-		c, err := repo.Prepare(token, owner, repository, "master")
+		url := fmt.Sprintf("https://%s@github.com/%s/%s.git", token, owner, repository)
+		c, err := repo.Prepare(url, "master")
 		if err != nil {
 			log.Fatalf("prepare failed: %v", err)
 		}

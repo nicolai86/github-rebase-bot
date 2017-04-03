@@ -8,6 +8,7 @@ import (
 	"net/http"
 
 	"github.com/google/go-github/github"
+	"github.com/nicolai86/github-rebase-bot/repo"
 )
 
 func processPullRequestReviewEvent(client *github.Client, input <-chan *github.PullRequestReviewEvent) <-chan *github.PullRequest {
@@ -91,7 +92,7 @@ func prHandler(client *github.Client) http.HandlerFunc {
 			prQueue <- evt.PullRequest
 
 			if evt.PullRequest.GetState() == "closed" {
-				cache.Cleanup(*evt.PullRequest.Number)
+				cache.Cleanup(repo.StringGitWorktree(evt.PullRequest.Head.GetRef()))
 			}
 		} else if eventType == "pull_request_review" {
 			evt := new(github.PullRequestReviewEvent)

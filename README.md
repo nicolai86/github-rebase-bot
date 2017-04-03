@@ -1,4 +1,6 @@
-# merge bot
+# rebase bot
+
+[![wercker status](https://app.wercker.com/status/a36462ea15c0685dbb331bd23641faa7/s/master "wercker status")](https://app.wercker.com/project/byKey/a36462ea15c0685dbb331bd23641faa7)
 
 the merge bot takes care of ensuring proper protocol is followed when working with
 pull-requests.
@@ -6,13 +8,5 @@ pull-requests.
 specifically it…
 
 … marks fresh PRs as WIP (yes, open them early!)  
-… automatically rebases master to ensure PR is up 2 date  
-… once LGTM'd it will rebase & wait for tests and merge automatically  
-
-## Architecture:
-
-one cache (git clone @master of repo)
-using a channel to sychronize startup of rebase workers
-rebase workers based off of work tree of git clone
-one rebase worker (chan) per PR 
-worker stops after inactivity period (7 days)
+… automatically rebases master once LGTM'd to ensure PR is up 2 date  
+… waits for tests and merge automatically when green

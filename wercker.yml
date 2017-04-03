@@ -5,6 +5,15 @@ build:
     - setup-go-workspace
 
     - script:
+        name: setup git
+        code: |
+          echo "deb http://ftp.debian.org/debian jessie-backports main" >  /etc/apt/sources.list.d/backports.list
+          apt-get update -y
+          apt-get -t jessie-backports install -y "git"
+          git config --global user.email "you@example.com"
+          git config --global user.name "Your Name"
+
+    - script:
         name: go get
         code: |
           go get
@@ -17,4 +26,5 @@ build:
     - script:
         name: go test
         code: |
+          export CLONE_FROM_GITHUB=true
           go test ./...
