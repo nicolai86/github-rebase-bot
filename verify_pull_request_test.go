@@ -19,12 +19,12 @@ func (f fakeStatusGetter) GetCombinedStatus(ctx context.Context, _ string, _ str
 	return f()
 }
 
-func TestProcessPullRequest_Filters(t *testing.T) {
+func TestVerifyPullRequest_Filters(t *testing.T) {
 	mergeLabel := "Ready to Merge"
 	t.Run("closed pull-requests", func(t *testing.T) {
 		ch := make(chan *github.PullRequest, 1)
 
-		prs := processPullRequest(nil, nil, mergeLabel, ch)
+		prs := verifyPullRequest(nil, nil, mergeLabel, ch)
 		ch <- &github.PullRequest{
 			State:  stringVal("closed"),
 			Number: intVal(1),
@@ -39,7 +39,7 @@ func TestProcessPullRequest_Filters(t *testing.T) {
 	t.Run("open pull-requests w/o merge label", func(t *testing.T) {
 		ch := make(chan *github.PullRequest, 1)
 
-		prs := processPullRequest(fakeIssueGetter(func() (*github.Issue, *github.Response, error) {
+		prs := verifyPullRequest(fakeIssueGetter(func() (*github.Issue, *github.Response, error) {
 			return &github.Issue{
 				Labels: []github.Label{
 					{Name: stringVal("LGTM")},
@@ -72,7 +72,7 @@ func TestProcessPullRequest_Filters(t *testing.T) {
 				State: stringVal("success"),
 			}, nil, nil
 		})
-		prs := processPullRequest(issueClient, statusClient, mergeLabel, ch)
+		prs := verifyPullRequest(issueClient, statusClient, mergeLabel, ch)
 		ch <- &github.PullRequest{
 			State:  stringVal("open"),
 			Number: intVal(1),
@@ -104,7 +104,7 @@ func TestProcessPullRequest_Filters(t *testing.T) {
 				State: stringVal("failure"),
 			}, nil, nil
 		})
-		prs := processPullRequest(issueClient, statusClient, mergeLabel, ch)
+		prs := verifyPullRequest(issueClient, statusClient, mergeLabel, ch)
 		ch <- &github.PullRequest{
 			State:  stringVal("open"),
 			Number: intVal(1),
@@ -122,7 +122,7 @@ func TestProcessPullRequest_Filters(t *testing.T) {
 	})
 }
 
-func TestProcessPullRequest_PassThrough(t *testing.T) {
+func TestVerifyPullRequest_PassThrough(t *testing.T) {
 	mergeLabel := "Ready to Merge"
 	ch := make(chan *github.PullRequest, 1)
 
@@ -139,7 +139,7 @@ func TestProcessPullRequest_PassThrough(t *testing.T) {
 		}, nil, nil
 	})
 
-	prs := processPullRequest(issueClient, statusClient, mergeLabel, ch)
+	prs := verifyPullRequest(issueClient, statusClient, mergeLabel, ch)
 	ch <- &github.PullRequest{
 		State:  stringVal("open"),
 		Number: intVal(1),

@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"log"
 
 	"github.com/google/go-github/github"
 )
@@ -26,8 +25,8 @@ type StatusGetter interface {
 	GetCombinedStatus(context.Context, string, string, string, *github.ListOptions) (*github.CombinedStatus, *github.Response, error)
 }
 
-// processPullRequest filters out non-mergeable pull requests
-func processPullRequest(issueClient IssueGetter, statusClient StatusGetter, mergeLabel string, input <-chan *github.PullRequest) <-chan *github.PullRequest {
+// verifyPullRequest filters out non-mergeable pull requests
+func verifyPullRequest(issueClient IssueGetter, statusClient StatusGetter, mergeLabel string, input <-chan *github.PullRequest) <-chan *github.PullRequest {
 	ret := make(chan *github.PullRequest)
 	go func() {
 		for pr := range input {
@@ -65,7 +64,6 @@ func processPullRequest(issueClient IssueGetter, statusClient StatusGetter, merg
 				continue
 			}
 
-			log.Printf("status for %q (%q): %q\n", pr.Head.GetRef(), pr.Head.GetSHA(), status.GetState())
 			if status.GetState() != "success" {
 				continue
 			}

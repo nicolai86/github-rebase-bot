@@ -90,7 +90,7 @@ func prHandler(client *github.Client) http.HandlerFunc {
 	//  - green
 	//  - marked with mergeLabel
 	//  - mergeable
-	rebaseQueue := processPullRequest(client.Issues, client.Repositories, mergeLabel, merge(
+	rebaseQueue := verifyPullRequest(client.Issues, client.Repositories, mergeLabel, merge(
 		prQueue,
 		processIssuesEvent(client.PullRequests, issueQueue),
 		processStatusEvent(client.PullRequests, statusQueue),
