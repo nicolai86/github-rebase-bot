@@ -11,13 +11,21 @@ import (
 	"github.com/nicolai86/github-rebase-bot/repo/internal/cmd"
 )
 
+type Enqueuer interface {
+	Enqueue(chan Signal)
+}
+
 // Worker manages a single branch for a repository
 type Worker struct {
 	cache  *Cache
 	branch string
 	prID   int
 	dir    string
-	Queue  chan chan Signal
+	queue  chan chan Signal
+}
+
+func (w *Worker) Enqueue(c chan Signal) {
+	w.queue <- c
 }
 
 func (w *Worker) inCacheDirectory() func(*exec.Cmd) {
@@ -68,7 +76,7 @@ func (w *Worker) update() error {
 func (w *Worker) run() {
 	for {
 		select {
-		case ch := <-w.Queue:
+		case ch := <-w.queue:
 			func(ch chan Signal) {
 				rev, err := w.cache.update()
 				if err != nil {
@@ -110,7 +118,7 @@ func (w *Worker) run() {
 				// if master changed, re-try
 				rev2, _ := w.cache.update()
 				if rev != rev2 {
-					w.Queue <- ch
+					w.queue <- ch
 					return
 				}
 

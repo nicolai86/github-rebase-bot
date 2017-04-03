@@ -8,7 +8,6 @@ import (
 	"net/http"
 
 	"github.com/google/go-github/github"
-	"github.com/nicolai86/github-rebase-bot/repo"
 )
 
 func processPullRequestReviewEvent(client *github.Client, input <-chan *github.PullRequestReviewEvent) <-chan *github.PullRequest {
@@ -16,31 +15,6 @@ func processPullRequestReviewEvent(client *github.Client, input <-chan *github.P
 	go func() {
 		for evt := range input {
 			ret <- evt.PullRequest
-		}
-		close(ret)
-	}()
-	return ret
-}
-
-func processRebase(client *github.Client, input <-chan *github.PullRequest) <-chan *github.PullRequest {
-	ret := make(chan *github.PullRequest)
-	go func() {
-		for pr := range input {
-			w, err := cache.Worker(
-				pr.Head.GetRef(),
-				pr.GetNumber(),
-			)
-			if err != nil {
-				continue
-			}
-			c := make(chan repo.Signal)
-			w.Queue <- c
-			go func(pr *github.PullRequest) {
-				sig := <-c
-				if sig.UpToDate && sig.Error == nil {
-					ret <- pr
-				}
-			}(pr)
 		}
 		close(ret)
 	}()
@@ -98,7 +72,7 @@ func prHandler(client *github.Client) http.HandlerFunc {
 	))
 
 	doneQueue := processMerge(client,
-		processRebase(client, rebaseQueue),
+		processRebase(cache, rebaseQueue),
 	)
 
 	go func() {

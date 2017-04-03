@@ -101,7 +101,7 @@ func (c *Cache) Cleanup(id int) error {
 
 // Worker manages workers for branches. By default a worker runs in its own
 // goroutine and is re-used if the same branch is requested multiple times
-func (c *Cache) Worker(branch string, id int) (*Worker, error) {
+func (c *Cache) Worker(branch string, id int) (Enqueuer, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	w, ok := c.workers[id]
@@ -118,7 +118,7 @@ func (c *Cache) Worker(branch string, id int) (*Worker, error) {
 		prID:   id,
 		dir:    dir,
 		cache:  c,
-		Queue:  make(chan chan Signal),
+		queue:  make(chan chan Signal),
 	}
 	c.workers[id] = w
 	if err := w.prepare(); err != nil {
