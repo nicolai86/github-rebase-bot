@@ -47,6 +47,8 @@ func processMerge(client *github.Client, input <-chan *github.PullRequest) <-cha
 				fmt.Printf("Failed deleting branch: %q\n", err)
 			}
 
+			// TODO check for PRs which could be affected by this merge (e.g. green and Ready to merge)
+
 			ret <- pr
 		}
 		close(ret)
@@ -79,6 +81,21 @@ func prHandler(client *github.Client) http.HandlerFunc {
 	go func() {
 		for pr := range doneQueue {
 			fmt.Printf("merged PR #%d\n", *pr.Number)
+
+			// re-evaluate all open PRs to kick off new rebase if necessary
+			prs, _, err := client.PullRequests.List(
+				context.Background(),
+				owner,
+				repository,
+				&github.PullRequestListOptions{
+					State: "open",
+				})
+			if err != nil {
+				continue
+			}
+			for _, pr := range prs {
+				prQueue <- pr
+			}
 		}
 	}()
 
