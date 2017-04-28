@@ -93,6 +93,7 @@ func removeWorktreeBranch(dir, branch string) error {
 	path := ""
 
 	stdout, _, err := cmd.Pipeline([]*exec.Cmd{
+		cmd.MustConfigure(exec.Command("git", "worktree", "prune"), inDir(dir)),
 		cmd.MustConfigure(exec.Command("git", "worktree", "list"), inDir(dir)),
 	}).Run()
 	if err != nil {
@@ -102,7 +103,7 @@ func removeWorktreeBranch(dir, branch string) error {
 	lines := strings.Split(stdout, "\n")
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
-		if strings.HasSuffix(line, fmt.Sprintf("[%s]", branch)) {
+		if strings.HasSuffix(line, fmt.Sprintf("[%s]", branch)) || strings.HasSuffix(line, fmt.Sprintf("[remotes/origin/%s]", branch)) {
 			parts := strings.Split(line, " ")
 			path = parts[0]
 			break
@@ -113,7 +114,11 @@ func removeWorktreeBranch(dir, branch string) error {
 		return nil
 	}
 
-	return exec.Command("rm", "-fr", path).Run()
+	_, _, err = cmd.Pipeline([]*exec.Cmd{
+		exec.Command("rm", "-fr", path),
+		cmd.MustConfigure(exec.Command("git", "worktree", "prune"), inDir(dir)),
+	}).Run()
+	return err
 }
 
 // Cleanup removes a branch

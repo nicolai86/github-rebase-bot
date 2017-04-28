@@ -78,6 +78,11 @@ func (w *Worker) prepare() (string, error) {
 	if err != nil {
 		return "", err
 	}
+
+	if err := removeWorktreeBranch(w.cache.cacheDirectory(), w.branch); err != nil {
+		return "", err
+	}
+
 	stdout, stderr, err := cmd.Pipeline([]*exec.Cmd{
 		cmd.MustConfigure(exec.Command("git", "worktree", "add", dir, fmt.Sprintf("remotes/origin/%s", w.branch)), w.cache.inCacheDirectory()),
 		cmd.MustConfigure(exec.Command("git", "checkout", w.branch), inDir(dir)),
