@@ -103,6 +103,33 @@ func TestWorker_rebase(t *testing.T) {
 	})
 }
 
+func TestWorker_prepare(t *testing.T) {
+	tmp, err := setupTestScenario()
+	if err != nil {
+		t.Fatal(err.Error())
+	}
+
+	cache, err := Prepare(tmp, "master")
+	if err != nil {
+		t.Fatal(err.Error())
+	}
+
+	t.Run("removes existing worktrees", func(t *testing.T) {
+		v, err := cache.Worker("needs-rebase")
+		if err != nil {
+			t.Fatal(err.Error())
+		}
+		w := v.(*Worker)
+		if _, err := w.prepare(); err != nil {
+			t.Fatal(err.Error())
+		}
+
+		if _, err := w.prepare(); err != nil {
+			t.Fatal(err.Error())
+		}
+	})
+}
+
 func TestWorker_update(t *testing.T) {
 	tmp, err := setupTestScenario()
 	if err != nil {
