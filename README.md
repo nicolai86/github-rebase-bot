@@ -7,6 +7,5 @@ pull-requests.
 
 specifically it…
 
-… marks fresh PRs as WIP (yes, open them early!)  
 … automatically rebases master once LGTM'd to ensure PR is up 2 date  
 … waits for tests and merge automatically when green
