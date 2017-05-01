@@ -49,7 +49,7 @@ func verifyPullRequest(issueClient IssueGetter, statusClient StatusGetter, merge
 				mergeable = mergeable || *label.Name == mergeLabel
 			}
 
-			if !mergeable {
+			if !mergeable || (pr.Mergeable != nil && !*pr.Mergeable) {
 				continue
 			}
 
@@ -65,10 +65,6 @@ func verifyPullRequest(issueClient IssueGetter, statusClient StatusGetter, merge
 			}
 
 			if status.GetState() != "success" {
-				continue
-			}
-
-			if !*pr.Mergeable {
 				continue
 			}
 
