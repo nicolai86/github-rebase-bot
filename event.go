@@ -60,7 +60,18 @@ func prHandler(client *github.Client) http.HandlerFunc {
 	issueQueue := make(chan *github.IssuesEvent, 100)
 	prQueue := make(chan *github.PullRequest, 100)
 	reviewQueue := make(chan *github.PullRequestReviewEvent, 100)
-	statusQueue := make(chan *github.StatusEvent, 100)
+	pushEventQueue := make(chan *github.PushEvent, 100)
+	statusEventQueue := make(chan *github.StatusEvent, 100)
+	statusPRQueue := make(chan *github.StatusEvent, 100)
+	mainlineStatusEventQueue := make(chan *github.StatusEvent, 100)
+
+	statusBroadcaster := statusEventBroadcaster{
+		listeners: []chan<- *github.StatusEvent{
+			statusPRQueue,
+			mainlineStatusEventQueue,
+		},
+	}
+	go statusBroadcaster.Listen(statusEventQueue)
 
 	// rebase queue contains pull requests which are:
 	//  - open
@@ -69,8 +80,10 @@ func prHandler(client *github.Client) http.HandlerFunc {
 	//  - mergeable
 	rebaseQueue := verifyPullRequest(client.Issues, client.Repositories, mergeLabel, merge(
 		prQueue,
+		processMainlineStatusEvent(client.PullRequests, mainlineStatusEventQueue),
 		processIssuesEvent(client.PullRequests, issueQueue),
-		processStatusEvent(client.PullRequests, statusQueue),
+		processStatusEvent(client.PullRequests, statusPRQueue),
+		processPushEvent(client.PullRequests, pushEventQueue),
 		processPullRequestReviewEvent(client, reviewQueue),
 	))
 
@@ -125,7 +138,12 @@ func prHandler(client *github.Client) http.HandlerFunc {
 			evt := new(github.StatusEvent)
 			json.NewDecoder(r.Body).Decode(evt)
 
-			statusQueue <- evt
+			statusEventQueue <- evt
+		} else if eventType == "push" {
+			evt := new(github.PushEvent)
+			json.NewDecoder(r.Body).Decode(evt)
+
+			pushEventQueue <- evt
 		} else {
 			log.Printf("Event %s not supported yet.\n", eventType)
 		}
