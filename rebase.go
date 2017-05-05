@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"sync"
 
 	"github.com/google/go-github/github"
 	"github.com/nicolai86/github-rebase-bot/repo"
@@ -24,6 +25,7 @@ func processRebase(cache WorkerCache, in <-chan *github.PullRequest) <-chan *git
 	}()
 
 	go func() {
+		wg := sync.WaitGroup{}
 		for pr := range input {
 			w, err := cache.Worker(pr.Head.GetRef())
 			if err != nil {
@@ -39,7 +41,9 @@ func processRebase(cache WorkerCache, in <-chan *github.PullRequest) <-chan *git
 			}
 
 			w.Enqueue(c)
+			wg.Add(1)
 			go func(pr *github.PullRequest, rev string) {
+				defer wg.Done()
 				sig := <-c
 
 				rev2, _ := cache.Update()
@@ -55,6 +59,7 @@ func processRebase(cache WorkerCache, in <-chan *github.PullRequest) <-chan *git
 			}(pr, rev)
 		}
 
+		wg.Wait()
 		close(ret)
 	}()
 
