@@ -23,6 +23,7 @@ var (
 	owner      string
 	repository string
 	mergeLabel string
+	mainline   string
 
 	cache *repo.Cache
 )
@@ -39,6 +40,7 @@ func main() {
 	flag.StringVar(&publicDNS, "public-dns", "", "publicly accessible dns endpoint for webhook push")
 	flag.StringVar(&mergeLabel, "merge-label", "", "which label is checked to kick off the merge process")
 	flag.StringVar(&addr, "addr", "", "address to listen on")
+	flag.StringVar(&mainline, "mainline", "master", "main branch")
 	flag.Parse()
 
 	if token == "" {
