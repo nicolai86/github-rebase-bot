@@ -36,7 +36,7 @@ func processRebase(cache WorkerCache, in <-chan *github.PullRequest) <-chan *git
 
 			rev, err := cache.Update()
 			if err != nil {
-				log.Printf("failed to update master: %v", err)
+				log.Printf("failed to update %q: %v", mainline, err)
 				continue
 			}
 
@@ -48,7 +48,7 @@ func processRebase(cache WorkerCache, in <-chan *github.PullRequest) <-chan *git
 
 				rev2, _ := cache.Update()
 				if rev != rev2 {
-					// master changed while we were processing this PR. re-process to handle cont. rebasing
+					// mainline changed while we were processing this PR. re-process to handle cont. rebasing
 					input <- pr
 					return
 				}

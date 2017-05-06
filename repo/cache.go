@@ -16,10 +16,15 @@ import (
 // Cache manages the checkout of a github repository as well as the master branch.
 // Additionally a cache manages all workers connected to this particular checkout
 type Cache struct {
-	dir string
-	mu  sync.Mutex
+	dir      string
+	mu       sync.Mutex
+	mainline string
 
 	workers map[string]*Worker
+}
+
+func (c *Cache) Mainline() string {
+	return c.mainline
 }
 
 func (c *Cache) inCacheDirectory() func(*exec.Cmd) {
@@ -34,13 +39,13 @@ func (c *Cache) Update() (string, error) {
 
 	stdout, stderr, err := cmd.Pipeline([]*exec.Cmd{
 		cmd.MustConfigure(exec.Command("git", "fetch", "--all"), c.inCacheDirectory()),
-		cmd.MustConfigure(exec.Command("git", "reset", "--hard", "origin/master"), c.inCacheDirectory()),
+		cmd.MustConfigure(exec.Command("git", "reset", "--hard", fmt.Sprintf("origin/%s", c.mainline)), c.inCacheDirectory()),
 		cmd.MustConfigure(exec.Command("git", "rev-parse", "HEAD"), c.inCacheDirectory()),
 	}).Run()
-	log.PrintLinesPrefixed("master", stdout)
-	log.PrintLinesPrefixed("master", stderr)
+	log.PrintLinesPrefixed(c.mainline, stdout)
+	log.PrintLinesPrefixed(c.mainline, stderr)
 	if err != nil {
-		log.Fatalf("Failed to update cache for master: %q", err)
+		log.Fatalf("Failed to update cache for %s: %q", c.mainline, err)
 	}
 
 	lines := strings.Split(stdout, "\n")
@@ -74,8 +79,9 @@ func Prepare(url, branch string) (*Cache, error) {
 	}
 
 	return &Cache{
-		dir:     dir,
-		workers: make(map[string]*Worker),
+		dir:      dir,
+		mainline: branch,
+		workers:  make(map[string]*Worker),
 	}, nil
 }
 
