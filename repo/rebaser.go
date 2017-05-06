@@ -36,7 +36,7 @@ func (b *branchRebaser) run() {
 				log.Printf("rebasing…")
 				up2date, err := b.w.rebase(dir)
 				if err != nil {
-					log.Printf("failed to rebase master: %v", err)
+					log.Printf("failed to rebase mainline: %v", err)
 					ch <- Signal{Error: err}
 					close(ch)
 					return

@@ -16,6 +16,7 @@ import (
 type GitCache interface {
 	Update() (string, error)
 	cacheDirectory() string
+	Mainline() string
 	Cleanup(GitWorktree) error
 	inCacheDirectory() func(*exec.Cmd)
 }
@@ -56,7 +57,7 @@ func inDir(dir string) func(*exec.Cmd) {
 
 func (w *Worker) rebase(dir string) (bool, error) {
 	stdout, stderr, err := cmd.Pipeline([]*exec.Cmd{
-		cmd.MustConfigure(exec.Command("git", "rebase", "origin/master"), inDir(dir)),
+		cmd.MustConfigure(exec.Command("git", "rebase", fmt.Sprintf("origin/%s", w.cache.Mainline())), inDir(dir)),
 	}).Run()
 	log.PrintLinesPrefixed(w.branch, stdout)
 	log.PrintLinesPrefixed(w.branch, stderr)
