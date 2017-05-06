@@ -1,0 +1,32 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: rebase-robot
+  namespace: github
+automountServiceAccountToken: true
+
+---
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1beta1
+metadata:
+  namespace: github
+  name: svc-reader
+rules:
+  - apiGroups: [""]
+    resources: ["services"]
+    verbs: ["get", "list"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: RoleBinding
+metadata:
+  name: svc-readers
+  namespace: github
+subjects:
+  - kind: ServiceAccount
+    name: rebase-robot
+    namespace: github
+roleRef:
+  kind: Role
+  name: svc-reader
+  apiGroup: rbac.authorization.k8s.io
