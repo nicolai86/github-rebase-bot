@@ -121,12 +121,7 @@ func createHook(client *github.Client, publicDNS, owner, repo string) (*github.H
 			"url":          fmt.Sprintf("%s/events", publicDNS),
 			"content_type": "json",
 		},
-		Events: []string{
-			"pull_request",
-			"status",
-			"pull_request_review",
-			"issues",
-		},
+		Events: []string{"*"},
 	})
 	return hook, err
 }
