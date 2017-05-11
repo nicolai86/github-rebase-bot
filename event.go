@@ -28,8 +28,8 @@ func processMerge(client *github.Client, input <-chan *github.PullRequest) <-cha
 		for pr := range input {
 			if _, _, err := client.PullRequests.Merge(
 				context.Background(),
-				owner,
-				repository,
+				pr.Base.User.GetLogin(),
+				pr.Base.Repo.GetName(),
 				pr.GetNumber(),
 				"merge-bot merged",
 				&github.PullRequestOptions{
@@ -40,8 +40,8 @@ func processMerge(client *github.Client, input <-chan *github.PullRequest) <-cha
 
 			if _, err := client.Git.DeleteRef(
 				context.Background(),
-				owner,
-				repository,
+				pr.Base.User.GetLogin(),
+				pr.Base.Repo.GetName(),
 				fmt.Sprintf("heads/%s", *pr.Head.Ref),
 			); err != nil {
 				fmt.Printf("Failed deleting branch: %q\n", err)
@@ -80,15 +80,15 @@ func prHandler(client *github.Client) http.HandlerFunc {
 	//  - mergeable
 	rebaseQueue := verifyPullRequest(client.Issues, client.Repositories, mergeLabel, merge(
 		prQueue,
-		processMainlineStatusEvent(client.PullRequests, mainlineStatusEventQueue),
+		processMainlineStatusEvent(repos, client.PullRequests, mainlineStatusEventQueue),
 		processIssuesEvent(client.PullRequests, issueQueue),
 		processStatusEvent(client.PullRequests, statusPRQueue),
-		processPushEvent(client.PullRequests, pushEventQueue),
+		processPushEvent(repos, client.PullRequests, pushEventQueue),
 		processPullRequestReviewEvent(client, reviewQueue),
 	))
 
 	doneQueue := processMerge(client,
-		processRebase(cache, rebaseQueue),
+		processRebase(repos, rebaseQueue),
 	)
 
 	go func() {
@@ -98,8 +98,8 @@ func prHandler(client *github.Client) http.HandlerFunc {
 			// re-evaluate all open PRs to kick off new rebase if necessary
 			prs, _, err := client.PullRequests.List(
 				context.Background(),
-				owner,
-				repository,
+				pr.Base.User.GetLogin(),
+				pr.Base.Repo.GetName(),
 				&github.PullRequestListOptions{
 					State: "open",
 				})
@@ -122,6 +122,7 @@ func prHandler(client *github.Client) http.HandlerFunc {
 			prQueue <- evt.PullRequest
 
 			if evt.PullRequest.GetState() == "closed" {
+				cache := repos.Find(evt.PullRequest.Base.User.GetLogin(), evt.PullRequest.Base.Repo.GetName()).cache
 				cache.Cleanup(repo.StringGitWorktree(evt.PullRequest.Head.GetRef()))
 			}
 		} else if eventType == "pull_request_review" {

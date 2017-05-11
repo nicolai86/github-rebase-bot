@@ -20,13 +20,64 @@ import (
 
 var (
 	token      string
-	owner      string
-	repository string
+	repos      repositories
 	mergeLabel string
-	mainline   string
-
-	cache *repo.Cache
 )
+
+type repositories []repository
+
+func (rs repositories) Find(owner, name string) *repository {
+	for i := range rs {
+		if rs[i].owner == owner && rs[i].name == name {
+			return &rs[i]
+		}
+	}
+	return nil
+}
+
+func (hps *repositories) String() string {
+	return fmt.Sprint(*hps)
+}
+
+func (hps *repositories) Set(str string) error {
+	for _, hp := range strings.Split(str, ",") {
+		var h repository
+		if err := h.Set(hp); err != nil {
+			return err
+		}
+		*hps = append(*hps, h)
+	}
+	return nil
+}
+
+type repository struct {
+	owner    string
+	name     string
+	mainline string
+	cache    WorkerCache
+	hook     *github.Hook
+}
+
+func (h *repository) String() string {
+	return fmt.Sprintf("%s/%s#%s", h.owner, h.name, h.mainline)
+}
+
+func (h *repository) Set(str string) error {
+	var parts = strings.Split(str, "/")
+	if len(parts) != 2 {
+		return fmt.Errorf("Invalid repository %q. Must be owner/name", str)
+	}
+	h.owner = parts[0]
+	parts = strings.Split(parts[1], "#")
+	h.name = parts[0]
+	if len(parts) == 2 {
+		h.mainline = parts[1]
+	}
+	if h.mainline == "" {
+		h.mainline = "master"
+	}
+	return nil
+}
 
 func main() {
 	var publicDNS string
@@ -35,16 +86,18 @@ func main() {
 		token = os.Getenv("GITHUB_TOKEN")
 	}
 	var addr string
-	flag.StringVar(&owner, "owner", "", "github owner")
-	flag.StringVar(&repository, "repo", "", "github repo (owned by owner)")
+	flag.Var(&repos, "repos", "github repos (owner/repo separated by commas)")
 	flag.StringVar(&publicDNS, "public-dns", "", "publicly accessible dns endpoint for webhook push")
 	flag.StringVar(&mergeLabel, "merge-label", "", "which label is checked to kick off the merge process")
 	flag.StringVar(&addr, "addr", "", "address to listen on")
-	flag.StringVar(&mainline, "mainline", "master", "main branch")
 	flag.Parse()
 
 	if token == "" {
 		log.Fatal("Missing github token.")
+	}
+
+	if len(repos) == 0 {
+		log.Fatal("Missing repositories.")
 	}
 
 	ts := oauth2.StaticTokenSource(
@@ -70,13 +123,13 @@ func main() {
 		log.Fatal("git config --global user.email failed: %q", err)
 	}
 
-	{
-		url := fmt.Sprintf("https://%s@github.com/%s/%s.git", token, owner, repository)
-		c, err := repo.Prepare(url, mainline)
+	for i, r := range repos {
+		url := fmt.Sprintf("https://%s@github.com/%s/%s.git", token, r.owner, r.name)
+		c, err := repo.Prepare(url, r.mainline)
 		if err != nil {
 			log.Fatalf("prepare failed: %v", err)
 		}
-		cache = c
+		repos[i].cache = c
 	}
 
 	// On ^C, or SIGTERM handle exit.
@@ -97,9 +150,12 @@ func main() {
 
 	var h *github.Hook
 	if publicDNS != "" {
-		h, err = registerHook(client, publicDNS, owner, repository)
-		if err != nil {
-			log.Fatal(err)
+		for i, repo := range repos {
+			h, err = registerHook(client, publicDNS, repo.owner, repo.name)
+			if err != nil {
+				log.Fatal(err)
+			}
+			repos[i].hook = h
 		}
 	}
 
@@ -109,7 +165,9 @@ func main() {
 	cancel()
 	log.Printf("Received %s, exiting.", sig.String())
 	if h != nil {
-		client.Repositories.DeleteHook(context.Background(), owner, repository, *h.ID)
+		for _, repo := range repos {
+			client.Repositories.DeleteHook(context.Background(), repo.owner, repo.name, *repo.hook.ID)
+		}
 	}
 }
 

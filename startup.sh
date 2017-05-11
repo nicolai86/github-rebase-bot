@@ -15,9 +15,7 @@ if [[ "z$PUBLIC_DNS" == "z" ]]; then
 fi
 
 /github-rebase-bot \
- -owner "$GITHUB_OWNER" \
- -repo "$GITHUB_REPO" \
+ -repos "$GITHUB_REPOS" \
  -public-dns http://$PUBLIC_DNS \
  -merge-label "$GITHUB_MERGE_LABEL" \
- -addr :8080 \
- -mainline "$GITHUB_MAINLINE"
+ -addr :8080

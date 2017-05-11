@@ -28,6 +28,14 @@ func TestVerifyPullRequest_Filters(t *testing.T) {
 		ch <- &github.PullRequest{
 			State:  stringVal("closed"),
 			Number: intVal(1),
+			Base: &github.PullRequestBranch{
+				Repo: &github.Repository{
+					Name: stringVal("test"),
+					Owner: &github.User{
+						Login: stringVal("test"),
+					},
+				},
+			},
 		}
 		close(ch)
 
@@ -49,6 +57,14 @@ func TestVerifyPullRequest_Filters(t *testing.T) {
 		ch <- &github.PullRequest{
 			State:  stringVal("open"),
 			Number: intVal(1),
+			Base: &github.PullRequestBranch{
+				Repo: &github.Repository{
+					Name: stringVal("test"),
+					Owner: &github.User{
+						Login: stringVal("test"),
+					},
+				},
+			},
 		}
 		close(ch)
 
@@ -79,6 +95,14 @@ func TestVerifyPullRequest_Filters(t *testing.T) {
 			Head: &github.PullRequestBranch{
 				Ref: stringVal("test"),
 				SHA: stringVal("098f6bcd4621d373cade4e832627b4f6"),
+			},
+			Base: &github.PullRequestBranch{
+				Repo: &github.Repository{
+					Name: stringVal("test"),
+					Owner: &github.User{
+						Login: stringVal("test"),
+					},
+				},
 			},
 			Mergeable: boolVal(false),
 		}
@@ -111,6 +135,14 @@ func TestVerifyPullRequest_Filters(t *testing.T) {
 			Head: &github.PullRequestBranch{
 				Ref: stringVal("test"),
 				SHA: stringVal("098f6bcd4621d373cade4e832627b4f6"),
+			},
+			Base: &github.PullRequestBranch{
+				Repo: &github.Repository{
+					Name: stringVal("test"),
+					Owner: &github.User{
+						Login: stringVal("test"),
+					},
+				},
 			},
 			Mergeable: boolVal(true),
 		}
@@ -146,6 +178,14 @@ func TestVerifyPullRequest_PassThrough(t *testing.T) {
 		Head: &github.PullRequestBranch{
 			Ref: stringVal("test"),
 			SHA: stringVal("098f6bcd4621d373cade4e832627b4f6"),
+		},
+		Base: &github.PullRequestBranch{
+			Repo: &github.Repository{
+				Name: stringVal("test"),
+				Owner: &github.User{
+					Login: stringVal("test"),
+				},
+			},
 		},
 		Mergeable: boolVal(true),
 	}
