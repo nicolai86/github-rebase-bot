@@ -35,13 +35,22 @@ func TestProcessMainlineStatusEvent(t *testing.T) {
 	ch := make(chan *github.StatusEvent, 1)
 
 	t.Run("adds open PRs on mainline success", func(t *testing.T) {
-		mainline = "master"
-		out := processMainlineStatusEvent(fakePullRequestResponse(2), ch)
+		out := processMainlineStatusEvent(repository{
+			owner:    "test",
+			name:     "test",
+			mainline: "master",
+		}, fakePullRequestResponse(2), ch)
 		ch <- &github.StatusEvent{
 			State: stringVal("success"),
 			Branches: []*github.Branch{
 				{
 					Name: stringVal("master"),
+				},
+			},
+			Repo: &github.Repository{
+				Name: stringVal("test"),
+				Owner: &github.User{
+					Login: stringVal("test"),
 				},
 			},
 		}
@@ -70,6 +79,14 @@ func fakePullRequestResponse(n int) fakePullRequestLister {
 				Head: &github.PullRequestBranch{
 					Ref: stringVal("test"),
 				},
+				Base: &github.PullRequestBranch{
+					User: &github.User{
+						Login: stringVal("test"),
+					},
+					Repo: &github.Repository{
+						Name: stringVal("test"),
+					},
+				},
 			})
 		}
 		return reqs, nil, nil
@@ -84,6 +101,12 @@ func TestProcessStatusEvent_Filters(t *testing.T) {
 			prs := processStatusEvent(nil, ch)
 			ch <- &github.StatusEvent{
 				State: stringVal(state),
+				Repo: &github.Repository{
+					Name: stringVal("test"),
+					Owner: &github.User{
+						Login: stringVal("test"),
+					},
+				},
 			}
 			close(ch)
 
@@ -104,6 +127,12 @@ func TestProcessStatusEvent_Filters(t *testing.T) {
 			Branches: []*github.Branch{
 				{Name: stringVal("test")},
 			},
+			Repo: &github.Repository{
+				Name: stringVal("test"),
+				Owner: &github.User{
+					Login: stringVal("test"),
+				},
+			},
 		}
 		close(ch)
 
@@ -121,6 +150,12 @@ func TestProcessStatusEvent_PassThrough(t *testing.T) {
 		State: stringVal("success"),
 		Branches: []*github.Branch{
 			{Name: stringVal("test")},
+		},
+		Repo: &github.Repository{
+			Name: stringVal("test"),
+			Owner: &github.User{
+				Login: stringVal("test"),
+			},
 		},
 	}
 	close(ch)

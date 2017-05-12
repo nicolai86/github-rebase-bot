@@ -28,8 +28,8 @@ func processMerge(client *github.Client, input <-chan *github.PullRequest) <-cha
 		for pr := range input {
 			if _, _, err := client.PullRequests.Merge(
 				context.Background(),
-				owner,
-				repository,
+				pr.Base.User.GetLogin(),
+				pr.Base.Repo.GetName(),
 				pr.GetNumber(),
 				"merge-bot merged",
 				&github.PullRequestOptions{
@@ -40,8 +40,8 @@ func processMerge(client *github.Client, input <-chan *github.PullRequest) <-cha
 
 			if _, err := client.Git.DeleteRef(
 				context.Background(),
-				owner,
-				repository,
+				pr.Base.User.GetLogin(),
+				pr.Base.Repo.GetName(),
 				fmt.Sprintf("heads/%s", *pr.Head.Ref),
 			); err != nil {
 				fmt.Printf("Failed deleting branch: %q\n", err)
@@ -56,7 +56,7 @@ func processMerge(client *github.Client, input <-chan *github.PullRequest) <-cha
 	return ret
 }
 
-func prHandler(client *github.Client) http.HandlerFunc {
+func prHandler(r repository, client *github.Client) http.HandlerFunc {
 	issueQueue := make(chan *github.IssuesEvent, 100)
 	prQueue := make(chan *github.PullRequest, 100)
 	reviewQueue := make(chan *github.PullRequestReviewEvent, 100)
@@ -80,15 +80,15 @@ func prHandler(client *github.Client) http.HandlerFunc {
 	//  - mergeable
 	rebaseQueue := verifyPullRequest(client.Issues, client.Repositories, mergeLabel, merge(
 		prQueue,
-		processMainlineStatusEvent(client.PullRequests, mainlineStatusEventQueue),
+		processMainlineStatusEvent(r, client.PullRequests, mainlineStatusEventQueue),
 		processIssuesEvent(client.PullRequests, issueQueue),
 		processStatusEvent(client.PullRequests, statusPRQueue),
-		processPushEvent(client.PullRequests, pushEventQueue),
+		processPushEvent(r, client.PullRequests, pushEventQueue),
 		processPullRequestReviewEvent(client, reviewQueue),
 	))
 
 	doneQueue := processMerge(client,
-		processRebase(cache, rebaseQueue),
+		processRebase(r, rebaseQueue),
 	)
 
 	go func() {
@@ -98,8 +98,8 @@ func prHandler(client *github.Client) http.HandlerFunc {
 			// re-evaluate all open PRs to kick off new rebase if necessary
 			prs, _, err := client.PullRequests.List(
 				context.Background(),
-				owner,
-				repository,
+				pr.Base.User.GetLogin(),
+				pr.Base.Repo.GetName(),
 				&github.PullRequestListOptions{
 					State: "open",
 				})
@@ -112,40 +112,41 @@ func prHandler(client *github.Client) http.HandlerFunc {
 		}
 	}()
 
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		eventType := r.Header.Get("X-GitHub-Event")
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		eventType := req.Header.Get("X-GitHub-Event")
 
 		if eventType == "pull_request" {
 			evt := new(github.PullRequestEvent)
-			json.NewDecoder(r.Body).Decode(evt)
+			json.NewDecoder(req.Body).Decode(evt)
 
 			prQueue <- evt.PullRequest
 
 			if evt.PullRequest.GetState() == "closed" {
+				cache := repos.Find(evt.PullRequest.Base.User.GetLogin(), evt.PullRequest.Base.Repo.GetName()).cache
 				cache.Cleanup(repo.StringGitWorktree(evt.PullRequest.Head.GetRef()))
 			}
 		} else if eventType == "pull_request_review" {
 			evt := new(github.PullRequestReviewEvent)
-			json.NewDecoder(r.Body).Decode(evt)
+			json.NewDecoder(req.Body).Decode(evt)
 
 			reviewQueue <- evt
 		} else if eventType == "issues" {
 			evt := new(github.IssuesEvent)
-			json.NewDecoder(r.Body).Decode(evt)
+			json.NewDecoder(req.Body).Decode(evt)
 
 			issueQueue <- evt
 		} else if eventType == "status" {
 			evt := new(github.StatusEvent)
-			json.NewDecoder(r.Body).Decode(evt)
+			json.NewDecoder(req.Body).Decode(evt)
 
 			statusEventQueue <- evt
 		} else if eventType == "push" {
 			evt := new(github.PushEvent)
-			json.NewDecoder(r.Body).Decode(evt)
+			json.NewDecoder(req.Body).Decode(evt)
 
 			pushEventQueue <- evt
 		} else {
-			log.Printf("Event %s not supported yet.\n", eventType)
+			log.Printf("%s/%s: Event %s not supported yet.\n", r.owner, r.name, eventType)
 		}
 	})
 }

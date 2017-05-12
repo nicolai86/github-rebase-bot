@@ -23,7 +23,7 @@ func (b *statusEventBroadcaster) Listen(in <-chan *github.StatusEvent) {
 }
 
 // processMainlineStatusEvent takes mainline status events and emits open PRs
-func processMainlineStatusEvent(client PullRequestLister, input <-chan *github.StatusEvent) <-chan *github.PullRequest {
+func processMainlineStatusEvent(repo repository, client PullRequestLister, input <-chan *github.StatusEvent) <-chan *github.PullRequest {
 	ret := make(chan *github.PullRequest)
 	go func() {
 		for evt := range input {
@@ -33,7 +33,7 @@ func processMainlineStatusEvent(client PullRequestLister, input <-chan *github.S
 
 			isMainline := false
 			for _, branch := range evt.Branches {
-				isMainline = isMainline || *branch.Name == mainline
+				isMainline = isMainline || *branch.Name == repo.mainline
 			}
 
 			if !isMainline {
@@ -42,8 +42,8 @@ func processMainlineStatusEvent(client PullRequestLister, input <-chan *github.S
 
 			prs, _, err := client.List(
 				context.Background(),
-				owner,
-				repository,
+				repo.owner,
+				repo.name,
 				&github.PullRequestListOptions{
 					State: "open",
 				})
@@ -71,8 +71,8 @@ func processStatusEvent(client PullRequestLister, input <-chan *github.StatusEve
 
 			prs, _, err := client.List(
 				context.Background(),
-				owner,
-				repository,
+				evt.Repo.Owner.GetLogin(),
+				evt.Repo.GetName(),
 				&github.PullRequestListOptions{
 					State: "open",
 				})

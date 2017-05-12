@@ -11,9 +11,10 @@ import (
 type WorkerCache interface {
 	Worker(string) (repo.Enqueuer, error)
 	Update() (string, error)
+	Cleanup(repo.GitWorktree) error
 }
 
-func processRebase(cache WorkerCache, in <-chan *github.PullRequest) <-chan *github.PullRequest {
+func processRebase(r repository, in <-chan *github.PullRequest) <-chan *github.PullRequest {
 	ret := make(chan *github.PullRequest)
 
 	input := make(chan *github.PullRequest)
@@ -27,6 +28,7 @@ func processRebase(cache WorkerCache, in <-chan *github.PullRequest) <-chan *git
 	go func() {
 		wg := sync.WaitGroup{}
 		for pr := range input {
+			cache := r.cache
 			w, err := cache.Worker(pr.Head.GetRef())
 			if err != nil {
 				continue
@@ -36,7 +38,7 @@ func processRebase(cache WorkerCache, in <-chan *github.PullRequest) <-chan *git
 
 			rev, err := cache.Update()
 			if err != nil {
-				log.Printf("failed to update %q: %v", mainline, err)
+				log.Printf("failed to update: %v", err)
 				continue
 			}
 

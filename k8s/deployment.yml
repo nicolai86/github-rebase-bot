@@ -15,10 +15,8 @@ spec:
         - name: rebase-bot
           image: nicolai86/github-rebase-bot:v0.0.3
           env:
-            - name: GITHUB_OWNER
-              value: nicolai86
-            - name: GITHUB_REPO
-              value: github-rebase-bot
+            - name: GITHUB_REPOS
+              value: nicolai86/github-rebase-bot
             - name: GITHUB_MERGE_LABEL
               value: LGTM
             - name: GITHUB_MAINLINE

@@ -36,8 +36,8 @@ func verifyPullRequest(issueClient IssueGetter, statusClient StatusGetter, merge
 
 			issue, _, err := issueClient.Get(
 				context.Background(),
-				owner,
-				repository,
+				pr.Base.Repo.Owner.GetLogin(),
+				pr.Base.Repo.GetName(),
 				pr.GetNumber(),
 			)
 			if err != nil {
@@ -55,8 +55,8 @@ func verifyPullRequest(issueClient IssueGetter, statusClient StatusGetter, merge
 
 			status, _, err := statusClient.GetCombinedStatus(
 				context.Background(),
-				owner,
-				repository,
+				pr.Base.Repo.Owner.GetLogin(),
+				pr.Base.Repo.GetName(),
 				*pr.Head.SHA,
 				&github.ListOptions{},
 			)

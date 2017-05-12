@@ -21,6 +21,12 @@ func TestProcessIssuesEvent_Filter(t *testing.T) {
 		Issue: &github.Issue{
 			Number: intVal(1),
 		},
+		Repo: &github.Repository{
+			Name: stringVal("test"),
+			Owner: &github.User{
+				Login: stringVal("test"),
+			},
+		},
 	}
 
 	ch := make(chan *github.IssuesEvent, 1)
@@ -43,6 +49,12 @@ func TestProcessIssuesEvent_PassThrough(t *testing.T) {
 	evt := github.IssuesEvent{
 		Issue: &github.Issue{
 			Number: intVal(1),
+		},
+		Repo: &github.Repository{
+			Name: stringVal("test"),
+			Owner: &github.User{
+				Login: stringVal("test"),
+			},
 		},
 	}
 

@@ -13,8 +13,8 @@ func processIssuesEvent(client PullRequestGetter, input <-chan *github.IssuesEve
 		for evt := range input {
 			pr, _, err := client.Get(
 				context.Background(),
-				owner,
-				repository,
+				evt.Repo.Owner.GetLogin(),
+				evt.Repo.GetName(),
 				evt.Issue.GetNumber())
 			if pr == nil || err != nil {
 				continue

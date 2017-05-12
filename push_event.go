@@ -7,19 +7,19 @@ import (
 	"github.com/google/go-github/github"
 )
 
-func processPushEvent(client PullRequestLister, input <-chan *github.PushEvent) <-chan *github.PullRequest {
+func processPushEvent(repo repository, client PullRequestLister, input <-chan *github.PushEvent) <-chan *github.PullRequest {
 	ret := make(chan *github.PullRequest)
 	go func() {
 		for evt := range input {
 
-			if evt.GetRef() != fmt.Sprintf("refs/heads/%s", mainline) {
+			if evt.GetRef() != fmt.Sprintf("refs/heads/%s", repo.mainline) {
 				continue
 			}
 
 			prs, _, err := client.List(
 				context.Background(),
-				owner,
-				repository,
+				repo.owner,
+				repo.name,
 				&github.PullRequestListOptions{
 					State: "open",
 				})
