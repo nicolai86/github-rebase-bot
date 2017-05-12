@@ -35,12 +35,10 @@ func TestProcessMainlineStatusEvent(t *testing.T) {
 	ch := make(chan *github.StatusEvent, 1)
 
 	t.Run("adds open PRs on mainline success", func(t *testing.T) {
-		out := processMainlineStatusEvent(repositories{
-			{
-				owner:    "test",
-				name:     "test",
-				mainline: "master",
-			},
+		out := processMainlineStatusEvent(repository{
+			owner:    "test",
+			name:     "test",
+			mainline: "master",
 		}, fakePullRequestResponse(2), ch)
 		ch <- &github.StatusEvent{
 			State: stringVal("success"),

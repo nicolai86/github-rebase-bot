@@ -138,7 +138,9 @@ func main() {
 	signal.Notify(c, syscall.SIGTERM)
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/events", prHandler(client))
+	for _, repo := range repos {
+		mux.HandleFunc(fmt.Sprintf("/events/%s/%s", repo.owner, repo.name), prHandler(repo, client))
+	}
 	srv := &http.Server{
 		Addr:    addr,
 		Handler: mux,
@@ -171,12 +173,12 @@ func main() {
 	}
 }
 
-func createHook(client *github.Client, publicDNS, owner, repo string) (*github.Hook, error) {
+func createHook(client *github.Client, publicDNS, owner, repo, hookTarget string) (*github.Hook, error) {
 	hook, _, err := client.Repositories.CreateHook(context.Background(), owner, repo, &github.Hook{
 		Name:   github.String("web"),
 		Active: github.Bool(true),
 		Config: map[string]interface{}{
-			"url":          fmt.Sprintf("%s/events", publicDNS),
+			"url":          hookTarget,
 			"content_type": "json",
 		},
 		Events: []string{"*"},
@@ -184,7 +186,7 @@ func createHook(client *github.Client, publicDNS, owner, repo string) (*github.H
 	return hook, err
 }
 
-func lookupHook(client *github.Client, publicDNS, owner, repo string) (*github.Hook, error) {
+func lookupHook(client *github.Client, owner, repo, hookTarget string) (*github.Hook, error) {
 	hooks, _, err := client.Repositories.ListHooks(context.Background(), owner, repo, &github.ListOptions{})
 	if err != nil {
 		return nil, err
@@ -193,8 +195,9 @@ func lookupHook(client *github.Client, publicDNS, owner, repo string) (*github.H
 	var h *github.Hook
 	for _, hook := range hooks {
 		if url, ok := hook.Config["url"].(string); ok {
-			if strings.Contains(url, publicDNS) {
+			if strings.Contains(url, hookTarget) {
 				h = hook
+				break
 			}
 		}
 	}
@@ -202,13 +205,14 @@ func lookupHook(client *github.Client, publicDNS, owner, repo string) (*github.H
 }
 
 func registerHook(client *github.Client, publicDNS, owner, repo string) (*github.Hook, error) {
-	hook, err := lookupHook(client, publicDNS, owner, repo)
+	hookTarget := fmt.Sprintf("%s/events/%s/%s", publicDNS, owner, repo)
+	hook, err := lookupHook(client, owner, repo, hookTarget)
 	if err != nil {
 		return nil, err
 	}
 
 	if hook == nil {
-		hook, err = createHook(client, publicDNS, owner, repo)
+		hook, err = createHook(client, publicDNS, owner, repo, hookTarget)
 		if err != nil {
 			return nil, err
 		}

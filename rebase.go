@@ -14,7 +14,7 @@ type WorkerCache interface {
 	Cleanup(repo.GitWorktree) error
 }
 
-func processRebase(rs repositories, in <-chan *github.PullRequest) <-chan *github.PullRequest {
+func processRebase(r repository, in <-chan *github.PullRequest) <-chan *github.PullRequest {
 	ret := make(chan *github.PullRequest)
 
 	input := make(chan *github.PullRequest)
@@ -28,7 +28,7 @@ func processRebase(rs repositories, in <-chan *github.PullRequest) <-chan *githu
 	go func() {
 		wg := sync.WaitGroup{}
 		for pr := range input {
-			cache := rs.Find(pr.Base.Repo.Owner.GetLogin(), pr.Base.Repo.GetName()).cache
+			cache := r.cache
 			w, err := cache.Worker(pr.Head.GetRef())
 			if err != nil {
 				continue

@@ -9,16 +9,12 @@ import (
 func TestProcessPushEvent(t *testing.T) {
 	ch := make(chan *github.PushEvent, 1)
 
-	repos := repositories{
-		{
+	t.Run("adds open PRs on mainline push", func(t *testing.T) {
+		out := processPushEvent(repository{
 			owner:    "test",
 			name:     "test",
 			mainline: "master",
-		},
-	}
-
-	t.Run("adds open PRs on mainline push", func(t *testing.T) {
-		out := processPushEvent(repos, fakePullRequestResponse(2), ch)
+		}, fakePullRequestResponse(2), ch)
 		ch <- &github.PushEvent{
 			Ref: stringVal("refs/heads/master"),
 			Repo: &github.PushEventRepository{

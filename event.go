@@ -56,7 +56,7 @@ func processMerge(client *github.Client, input <-chan *github.PullRequest) <-cha
 	return ret
 }
 
-func prHandler(client *github.Client) http.HandlerFunc {
+func prHandler(r repository, client *github.Client) http.HandlerFunc {
 	issueQueue := make(chan *github.IssuesEvent, 100)
 	prQueue := make(chan *github.PullRequest, 100)
 	reviewQueue := make(chan *github.PullRequestReviewEvent, 100)
@@ -80,15 +80,15 @@ func prHandler(client *github.Client) http.HandlerFunc {
 	//  - mergeable
 	rebaseQueue := verifyPullRequest(client.Issues, client.Repositories, mergeLabel, merge(
 		prQueue,
-		processMainlineStatusEvent(repos, client.PullRequests, mainlineStatusEventQueue),
+		processMainlineStatusEvent(r, client.PullRequests, mainlineStatusEventQueue),
 		processIssuesEvent(client.PullRequests, issueQueue),
 		processStatusEvent(client.PullRequests, statusPRQueue),
-		processPushEvent(repos, client.PullRequests, pushEventQueue),
+		processPushEvent(r, client.PullRequests, pushEventQueue),
 		processPullRequestReviewEvent(client, reviewQueue),
 	))
 
 	doneQueue := processMerge(client,
-		processRebase(repos, rebaseQueue),
+		processRebase(r, rebaseQueue),
 	)
 
 	go func() {

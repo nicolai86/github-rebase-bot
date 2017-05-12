@@ -37,21 +37,19 @@ func TestProcessRebase(t *testing.T) {
 		prNumber := 2202
 		var wg sync.WaitGroup
 		wg.Add(1)
-		repos := repositories{
-			{
-				owner:    "test",
-				name:     "test",
-				mainline: "master",
-				cache: fakeWorkerCache(func(branch string) (repo.Enqueuer, error) {
-					wg.Done()
-					if prBranch != branch {
-						t.Fatalf("Expected branch %q but got %q ", prBranch, branch)
-					}
-					return nil, errors.New("failed to checkout repo")
-				}),
-			},
+		r := repository{
+			owner:    "test",
+			name:     "test",
+			mainline: "master",
+			cache: fakeWorkerCache(func(branch string) (repo.Enqueuer, error) {
+				wg.Done()
+				if prBranch != branch {
+					t.Fatalf("Expected branch %q but got %q ", prBranch, branch)
+				}
+				return nil, errors.New("failed to checkout repo")
+			}),
 		}
-		processRebase(repos, ch)
+		processRebase(r, ch)
 		ch <- &github.PullRequest{
 			Number: intVal(prNumber),
 			Head: &github.PullRequestBranch{
@@ -72,17 +70,15 @@ func TestProcessRebase(t *testing.T) {
 
 	t.Run("filters when worker fetching errors", func(t *testing.T) {
 		ch := make(chan *github.PullRequest)
-		repos := repositories{
-			{
-				owner:    "test",
-				name:     "test",
-				mainline: "master",
-				cache: fakeWorkerCache(func(_ string) (repo.Enqueuer, error) {
-					return nil, errors.New("failed to checkout repo")
-				}),
-			},
+		r := repository{
+			owner:    "test",
+			name:     "test",
+			mainline: "master",
+			cache: fakeWorkerCache(func(_ string) (repo.Enqueuer, error) {
+				return nil, errors.New("failed to checkout repo")
+			}),
 		}
-		ret := processRebase(repos, ch)
+		ret := processRebase(r, ch)
 		ch <- &github.PullRequest{
 			Base: &github.PullRequestBranch{
 				Repo: &github.Repository{
@@ -101,15 +97,13 @@ func TestProcessRebase(t *testing.T) {
 
 	t.Run("filters rebased branches", func(t *testing.T) {
 		ch := make(chan *github.PullRequest)
-		ret := processRebase(repositories{
-			{
-				owner:    "test",
-				name:     "test",
-				mainline: "master",
-				cache: fakeWorkerCache(func(branch string) (repo.Enqueuer, error) {
-					return fakeEnqueuer(func() repo.Signal { return repo.Signal{UpToDate: false} }), nil
-				}),
-			},
+		ret := processRebase(repository{
+			owner:    "test",
+			name:     "test",
+			mainline: "master",
+			cache: fakeWorkerCache(func(branch string) (repo.Enqueuer, error) {
+				return fakeEnqueuer(func() repo.Signal { return repo.Signal{UpToDate: false} }), nil
+			}),
 		}, ch)
 		ch <- &github.PullRequest{
 			Base: &github.PullRequestBranch{
@@ -129,15 +123,13 @@ func TestProcessRebase(t *testing.T) {
 
 	t.Run("filters error'd branches", func(t *testing.T) {
 		ch := make(chan *github.PullRequest)
-		ret := processRebase(repositories{
-			{
-				owner:    "test",
-				name:     "test",
-				mainline: "master",
-				cache: fakeWorkerCache(func(branch string) (repo.Enqueuer, error) {
-					return fakeEnqueuer(func() repo.Signal { return repo.Signal{Error: errors.New("git: unknown binary")} }), nil
-				}),
-			},
+		ret := processRebase(repository{
+			owner:    "test",
+			name:     "test",
+			mainline: "master",
+			cache: fakeWorkerCache(func(branch string) (repo.Enqueuer, error) {
+				return fakeEnqueuer(func() repo.Signal { return repo.Signal{Error: errors.New("git: unknown binary")} }), nil
+			}),
 		}, ch)
 		ch <- &github.PullRequest{
 			Base: &github.PullRequestBranch{
@@ -157,15 +149,13 @@ func TestProcessRebase(t *testing.T) {
 
 	t.Run("passes through up2date branches", func(t *testing.T) {
 		ch := make(chan *github.PullRequest)
-		ret := processRebase(repositories{
-			{
-				owner:    "test",
-				name:     "test",
-				mainline: "master",
-				cache: fakeWorkerCache(func(branch string) (repo.Enqueuer, error) {
-					return fakeEnqueuer(func() repo.Signal { return repo.Signal{UpToDate: true} }), nil
-				}),
-			},
+		ret := processRebase(repository{
+			owner:    "test",
+			name:     "test",
+			mainline: "master",
+			cache: fakeWorkerCache(func(branch string) (repo.Enqueuer, error) {
+				return fakeEnqueuer(func() repo.Signal { return repo.Signal{UpToDate: true} }), nil
+			}),
 		}, ch)
 		ch <- &github.PullRequest{
 			Base: &github.PullRequestBranch{
