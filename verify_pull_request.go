@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"log"
 
 	"github.com/google/go-github/github"
 )
@@ -31,6 +32,7 @@ func verifyPullRequest(issueClient IssueGetter, statusClient StatusGetter, merge
 	go func() {
 		for pr := range input {
 			if pr.GetState() != "open" {
+				log.Printf("%s/%s: pr %d is %s.\n", pr.Base.Repo.Owner.GetLogin(), pr.Base.Repo.GetName(), pr.GetNumber(), pr.GetState())
 				continue
 			}
 
@@ -41,6 +43,7 @@ func verifyPullRequest(issueClient IssueGetter, statusClient StatusGetter, merge
 				pr.GetNumber(),
 			)
 			if err != nil {
+				log.Printf("%s/%s: pr %d failed to lookup issue %s.\n", pr.Base.Repo.Owner.GetLogin(), pr.Base.Repo.GetName(), pr.GetNumber(), err.Error())
 				continue
 			}
 
@@ -50,6 +53,7 @@ func verifyPullRequest(issueClient IssueGetter, statusClient StatusGetter, merge
 			}
 
 			if !mergeable || (pr.Mergeable != nil && !*pr.Mergeable) {
+				log.Printf("%s/%s: pr %d is not mergeable.\n", pr.Base.Repo.Owner.GetLogin(), pr.Base.Repo.GetName(), pr.GetNumber())
 				continue
 			}
 
@@ -65,6 +69,7 @@ func verifyPullRequest(issueClient IssueGetter, statusClient StatusGetter, merge
 			}
 
 			if status.GetState() != "success" {
+				log.Printf("%s/%s: pr %d status is %s.\n", pr.Base.Repo.Owner.GetLogin(), pr.Base.Repo.GetName(), pr.GetNumber(), status.GetState())
 				continue
 			}
 

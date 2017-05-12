@@ -30,10 +30,10 @@ func TestVerifyPullRequest_Filters(t *testing.T) {
 			Number: intVal(1),
 			Base: &github.PullRequestBranch{
 				Repo: &github.Repository{
-					Name: stringVal("test"),
 					Owner: &github.User{
 						Login: stringVal("test"),
 					},
+					Name: stringVal("test"),
 				},
 			},
 		}
@@ -59,10 +59,10 @@ func TestVerifyPullRequest_Filters(t *testing.T) {
 			Number: intVal(1),
 			Base: &github.PullRequestBranch{
 				Repo: &github.Repository{
-					Name: stringVal("test"),
 					Owner: &github.User{
 						Login: stringVal("test"),
 					},
+					Name: stringVal("test"),
 				},
 			},
 		}
@@ -98,10 +98,10 @@ func TestVerifyPullRequest_Filters(t *testing.T) {
 			},
 			Base: &github.PullRequestBranch{
 				Repo: &github.Repository{
-					Name: stringVal("test"),
 					Owner: &github.User{
 						Login: stringVal("test"),
 					},
+					Name: stringVal("test"),
 				},
 			},
 			Mergeable: boolVal(false),
@@ -138,10 +138,10 @@ func TestVerifyPullRequest_Filters(t *testing.T) {
 			},
 			Base: &github.PullRequestBranch{
 				Repo: &github.Repository{
-					Name: stringVal("test"),
 					Owner: &github.User{
 						Login: stringVal("test"),
 					},
+					Name: stringVal("test"),
 				},
 			},
 			Mergeable: boolVal(true),
@@ -181,10 +181,10 @@ func TestVerifyPullRequest_PassThrough(t *testing.T) {
 		},
 		Base: &github.PullRequestBranch{
 			Repo: &github.Repository{
-				Name: stringVal("test"),
 				Owner: &github.User{
 					Login: stringVal("test"),
 				},
+				Name: stringVal("test"),
 			},
 		},
 		Mergeable: boolVal(true),

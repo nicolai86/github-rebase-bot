@@ -98,10 +98,12 @@ func (w StringGitWorktree) Branch() string {
 func removeWorktreeBranch(dir, branch string) error {
 	path := ""
 
-	stdout, _, err := cmd.Pipeline([]*exec.Cmd{
+	stdout, stderr, err := cmd.Pipeline([]*exec.Cmd{
 		cmd.MustConfigure(exec.Command("git", "worktree", "prune"), inDir(dir)),
 		cmd.MustConfigure(exec.Command("git", "worktree", "list"), inDir(dir)),
 	}).Run()
+	log.PrintLinesPrefixed(branch, stdout)
+	log.PrintLinesPrefixed(branch, stderr)
 	if err != nil {
 		return err
 	}
@@ -117,13 +119,16 @@ func removeWorktreeBranch(dir, branch string) error {
 	}
 
 	if path == "" {
+		log.Printf("Did not find %q in worktree of %q", branch, dir)
 		return nil
 	}
 
-	_, _, err = cmd.Pipeline([]*exec.Cmd{
+	stdout, stderr, err = cmd.Pipeline([]*exec.Cmd{
 		exec.Command("rm", "-fr", path),
 		cmd.MustConfigure(exec.Command("git", "worktree", "prune"), inDir(dir)),
 	}).Run()
+	log.PrintLinesPrefixed(branch, stdout)
+	log.PrintLinesPrefixed(branch, stderr)
 	return err
 }
 
