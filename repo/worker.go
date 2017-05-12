@@ -62,6 +62,11 @@ func (w *Worker) rebase(dir string) (bool, error) {
 	log.PrintLinesPrefixed(w.branch, stdout)
 	log.PrintLinesPrefixed(w.branch, stderr)
 	if err != nil {
+		stdout, stderr, _ := cmd.Pipeline([]*exec.Cmd{
+			cmd.MustConfigure(exec.Command("git", "rebase", "--abort"), inDir(dir)),
+		}).Run()
+		log.PrintLinesPrefixed(w.branch, stdout)
+		log.PrintLinesPrefixed(w.branch, stderr)
 		return false, err
 	}
 	return strings.Contains(stdout, "is up to date"), nil
