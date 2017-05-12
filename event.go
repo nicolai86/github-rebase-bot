@@ -112,12 +112,12 @@ func prHandler(r repository, client *github.Client) http.HandlerFunc {
 		}
 	}()
 
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		eventType := r.Header.Get("X-GitHub-Event")
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		eventType := req.Header.Get("X-GitHub-Event")
 
 		if eventType == "pull_request" {
 			evt := new(github.PullRequestEvent)
-			json.NewDecoder(r.Body).Decode(evt)
+			json.NewDecoder(req.Body).Decode(evt)
 
 			prQueue <- evt.PullRequest
 
@@ -127,26 +127,26 @@ func prHandler(r repository, client *github.Client) http.HandlerFunc {
 			}
 		} else if eventType == "pull_request_review" {
 			evt := new(github.PullRequestReviewEvent)
-			json.NewDecoder(r.Body).Decode(evt)
+			json.NewDecoder(req.Body).Decode(evt)
 
 			reviewQueue <- evt
 		} else if eventType == "issues" {
 			evt := new(github.IssuesEvent)
-			json.NewDecoder(r.Body).Decode(evt)
+			json.NewDecoder(req.Body).Decode(evt)
 
 			issueQueue <- evt
 		} else if eventType == "status" {
 			evt := new(github.StatusEvent)
-			json.NewDecoder(r.Body).Decode(evt)
+			json.NewDecoder(req.Body).Decode(evt)
 
 			statusEventQueue <- evt
 		} else if eventType == "push" {
 			evt := new(github.PushEvent)
-			json.NewDecoder(r.Body).Decode(evt)
+			json.NewDecoder(req.Body).Decode(evt)
 
 			pushEventQueue <- evt
 		} else {
-			log.Printf("Event %s not supported yet.\n", eventType)
+			log.Printf("%s/%s: Event %s not supported yet.\n", r.owner, r.name, eventType)
 		}
 	})
 }
