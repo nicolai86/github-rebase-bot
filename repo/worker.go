@@ -9,8 +9,8 @@ import (
 	"path"
 	"strings"
 
-	"github.com/nicolai86/github-rebase-bot/log"
 	"github.com/nicolai86/github-rebase-bot/repo/internal/cmd"
+	"github.com/nicolai86/github-rebase-bot/repo/internal/log"
 )
 
 type GitCache interface {
