@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log"
+	"strings"
 
 	"github.com/google/go-github/github"
 )
@@ -49,7 +50,7 @@ func verifyPullRequest(issueClient IssueGetter, statusClient StatusGetter, merge
 
 			mergeable := false
 			for _, label := range issue.Labels {
-				mergeable = mergeable || *label.Name == mergeLabel
+				mergeable = mergeable || strings.EqualFold(*label.Name, mergeLabel)
 			}
 
 			if !mergeable || (pr.Mergeable != nil && !*pr.Mergeable) {

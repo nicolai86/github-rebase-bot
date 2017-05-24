@@ -161,7 +161,7 @@ func TestVerifyPullRequest_PassThrough(t *testing.T) {
 	issueClient := fakeIssueGetter(func() (*github.Issue, *github.Response, error) {
 		return &github.Issue{
 			Labels: []github.Label{
-				{Name: stringVal(mergeLabel)},
+				{Name: stringVal("ready to Merge")},
 			},
 		}, nil, nil
 	})
