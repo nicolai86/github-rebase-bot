@@ -2,7 +2,8 @@ package repo
 
 import (
 	"context"
-	"log"
+
+	"github.com/nicolai86/github-rebase-bot/repo/internal/log"
 )
 
 type branchRebaser struct {

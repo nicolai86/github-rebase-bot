@@ -9,8 +9,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/nicolai86/github-rebase-bot/log"
 	"github.com/nicolai86/github-rebase-bot/repo/internal/cmd"
+	"github.com/nicolai86/github-rebase-bot/repo/internal/log"
 )
 
 // Cache manages the checkout of a github repository as well as the master branch.
