@@ -13,7 +13,7 @@ spec:
       serviceAccountName: rebase-robot
       containers:
         - name: rebase-bot
-          image: nicolai86/github-rebase-bot:v0.0.4
+          image: nicolai86/github-rebase-bot:v0.0.5
           env:
             - name: GITHUB_REPOS
               value: nicolai86/github-rebase-bot
