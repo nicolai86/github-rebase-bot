@@ -1,4 +1,4 @@
-package main
+package processors
 
 import (
 	"testing"
@@ -6,14 +6,14 @@ import (
 	"github.com/google/go-github/github"
 )
 
-func TestProcessPushEvent(t *testing.T) {
+func TestPushEvent(t *testing.T) {
 	ch := make(chan *github.PushEvent, 1)
 
 	t.Run("adds open PRs on mainline push", func(t *testing.T) {
-		out := processPushEvent(repository{
-			owner:    "test",
-			name:     "test",
-			mainline: "master",
+		out := PushEvent(Repository{
+			Owner:    "test",
+			Name:     "test",
+			Mainline: "master",
 		}, fakePullRequestResponse(2), ch)
 		ch <- &github.PushEvent{
 			Ref: stringVal("refs/heads/master"),

@@ -1,4 +1,4 @@
-package main
+package processors
 
 import (
 	"log"
@@ -8,13 +8,10 @@ import (
 	"github.com/nicolai86/github-rebase-bot/repo"
 )
 
-type WorkerCache interface {
-	Worker(string) (repo.Enqueuer, error)
-	Update() (string, error)
-	Cleanup(repo.GitWorktree) error
-}
-
-func processRebase(r repository, in <-chan *github.PullRequest) <-chan *github.PullRequest {
+// Rebase rebases a pull request with mainline.
+// if the rebase is possible the changes are pushed to github.
+// when no rebase was necessary the PR is emitted
+func Rebase(r Repository, in <-chan *github.PullRequest) <-chan *github.PullRequest {
 	ret := make(chan *github.PullRequest)
 
 	input := make(chan *github.PullRequest)
@@ -28,7 +25,7 @@ func processRebase(r repository, in <-chan *github.PullRequest) <-chan *github.P
 	go func() {
 		wg := sync.WaitGroup{}
 		for pr := range input {
-			cache := r.cache
+			cache := r.Cache
 			w, err := cache.Worker(pr.Head.GetRef())
 			if err != nil {
 				continue

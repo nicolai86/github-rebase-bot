@@ -8,52 +8,24 @@ import (
 	"net/http"
 
 	"github.com/google/go-github/github"
+	"github.com/nicolai86/github-rebase-bot/processors"
 	"github.com/nicolai86/github-rebase-bot/repo"
 )
 
-func processPullRequestReviewEvent(client *github.Client, input <-chan *github.PullRequestReviewEvent) <-chan *github.PullRequest {
-	ret := make(chan *github.PullRequest)
-	go func() {
-		for evt := range input {
-			ret <- evt.PullRequest
-		}
-		close(ret)
-	}()
-	return ret
+type statusEventBroadcaster struct {
+	listeners []chan<- *github.StatusEvent
 }
 
-func processMerge(client *github.Client, input <-chan *github.PullRequest) <-chan *github.PullRequest {
-	ret := make(chan *github.PullRequest)
-	go func() {
-		for pr := range input {
-			if _, _, err := client.PullRequests.Merge(
-				context.Background(),
-				pr.Base.User.GetLogin(),
-				pr.Base.Repo.GetName(),
-				pr.GetNumber(),
-				"merge-bot merged",
-				&github.PullRequestOptions{
-					MergeMethod: "merge",
-				}); err != nil {
-				continue
-			}
-
-			if _, err := client.Git.DeleteRef(
-				context.Background(),
-				pr.Base.User.GetLogin(),
-				pr.Base.Repo.GetName(),
-				fmt.Sprintf("heads/%s", *pr.Head.Ref),
-			); err != nil {
-				fmt.Printf("Failed deleting branch: %q\n", err)
-			}
-
-			// TODO check for PRs which could be affected by this merge (e.g. green and Ready to merge)
-
-			ret <- pr
+func (b *statusEventBroadcaster) Listen(in <-chan *github.StatusEvent) {
+	for evt := range in {
+		for _, l := range b.listeners {
+			l <- evt
 		}
-		close(ret)
-	}()
-	return ret
+	}
+
+	for _, l := range b.listeners {
+		close(l)
+	}
 }
 
 func prHandler(r repository, client *github.Client) http.HandlerFunc {
@@ -80,15 +52,15 @@ func prHandler(r repository, client *github.Client) http.HandlerFunc {
 	//  - mergeable
 	rebaseQueue := verifyPullRequest(client.Issues, client.Repositories, mergeLabel, merge(
 		prQueue,
-		processMainlineStatusEvent(r, client.PullRequests, mainlineStatusEventQueue),
-		processIssuesEvent(client.PullRequests, issueQueue),
-		processStatusEvent(client.PullRequests, statusPRQueue),
-		processPushEvent(r, client.PullRequests, pushEventQueue),
-		processPullRequestReviewEvent(client, reviewQueue),
+		processors.MainlineStatusEvent(r.Repository, client.PullRequests, mainlineStatusEventQueue),
+		processors.IssuesEvent(client.PullRequests, issueQueue),
+		processors.StatusEvent(client.PullRequests, statusPRQueue),
+		processors.PushEvent(r.Repository, client.PullRequests, pushEventQueue),
+		processors.PullRequestReviewEvent(client, reviewQueue),
 	))
 
-	doneQueue := processMerge(client,
-		processRebase(r, rebaseQueue),
+	doneQueue := processors.Merge(client,
+		processors.Rebase(r.Repository, rebaseQueue),
 	)
 
 	go func() {
@@ -138,7 +110,7 @@ func prHandler(r repository, client *github.Client) http.HandlerFunc {
 			prQueue <- evt.PullRequest
 
 			if evt.PullRequest.GetState() == "closed" {
-				cache := repos.Find(evt.PullRequest.Base.User.GetLogin(), evt.PullRequest.Base.Repo.GetName()).cache
+				cache := repos.Find(evt.PullRequest.Base.User.GetLogin(), evt.PullRequest.Base.Repo.GetName()).Repository.Cache
 				cache.Cleanup(repo.StringGitWorktree(evt.PullRequest.Head.GetRef()))
 			}
 		} else if eventType == "pull_request_review" {
@@ -162,7 +134,7 @@ func prHandler(r repository, client *github.Client) http.HandlerFunc {
 
 			pushEventQueue <- evt
 		} else {
-			log.Printf("%s/%s: Event %s not supported yet.\n", r.owner, r.name, eventType)
+			log.Printf("%s/%s: Event %s not supported yet.\n", r.Owner, r.Name, eventType)
 		}
 	})
 }

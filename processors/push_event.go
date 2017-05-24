@@ -1,4 +1,4 @@
-package main
+package processors
 
 import (
 	"context"
@@ -7,19 +7,21 @@ import (
 	"github.com/google/go-github/github"
 )
 
-func processPushEvent(repo repository, client PullRequestLister, input <-chan *github.PushEvent) <-chan *github.PullRequest {
+// PushEvent emits every open PR once a change on mainline was received.
+// This allows the bot to re-check all open PRs once master changed.
+func PushEvent(repo Repository, client PullRequestLister, input <-chan *github.PushEvent) <-chan *github.PullRequest {
 	ret := make(chan *github.PullRequest)
 	go func() {
 		for evt := range input {
 
-			if evt.GetRef() != fmt.Sprintf("refs/heads/%s", repo.mainline) {
+			if evt.GetRef() != fmt.Sprintf("refs/heads/%s", repo.Mainline) {
 				continue
 			}
 
 			prs, _, err := client.List(
 				context.Background(),
-				repo.owner,
-				repo.name,
+				repo.Owner,
+				repo.Name,
 				&github.PullRequestListOptions{
 					State: "open",
 				})

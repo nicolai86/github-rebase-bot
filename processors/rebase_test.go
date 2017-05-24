@@ -1,4 +1,4 @@
-package main
+package processors
 
 import (
 	"errors"
@@ -29,19 +29,18 @@ func (f fakeEnqueuer) Enqueue(c chan repo.Signal) {
 	close(c)
 }
 
-func TestProcessRebase(t *testing.T) {
-
+func TestRebase(t *testing.T) {
 	t.Run("requests a branch specific worker", func(t *testing.T) {
 		ch := make(chan *github.PullRequest)
 		prBranch := "super-feature"
 		prNumber := 2202
 		var wg sync.WaitGroup
 		wg.Add(1)
-		r := repository{
-			owner:    "test",
-			name:     "test",
-			mainline: "master",
-			cache: fakeWorkerCache(func(branch string) (repo.Enqueuer, error) {
+		r := Repository{
+			Owner:    "test",
+			Name:     "test",
+			Mainline: "master",
+			Cache: fakeWorkerCache(func(branch string) (repo.Enqueuer, error) {
 				wg.Done()
 				if prBranch != branch {
 					t.Fatalf("Expected branch %q but got %q ", prBranch, branch)
@@ -49,7 +48,7 @@ func TestProcessRebase(t *testing.T) {
 				return nil, errors.New("failed to checkout repo")
 			}),
 		}
-		processRebase(r, ch)
+		Rebase(r, ch)
 		ch <- &github.PullRequest{
 			Number: intVal(prNumber),
 			Head: &github.PullRequestBranch{
@@ -70,15 +69,15 @@ func TestProcessRebase(t *testing.T) {
 
 	t.Run("filters when worker fetching errors", func(t *testing.T) {
 		ch := make(chan *github.PullRequest)
-		r := repository{
-			owner:    "test",
-			name:     "test",
-			mainline: "master",
-			cache: fakeWorkerCache(func(_ string) (repo.Enqueuer, error) {
+		r := Repository{
+			Owner:    "test",
+			Name:     "test",
+			Mainline: "master",
+			Cache: fakeWorkerCache(func(_ string) (repo.Enqueuer, error) {
 				return nil, errors.New("failed to checkout repo")
 			}),
 		}
-		ret := processRebase(r, ch)
+		ret := Rebase(r, ch)
 		ch <- &github.PullRequest{
 			Base: &github.PullRequestBranch{
 				Repo: &github.Repository{
@@ -97,11 +96,11 @@ func TestProcessRebase(t *testing.T) {
 
 	t.Run("filters rebased branches", func(t *testing.T) {
 		ch := make(chan *github.PullRequest)
-		ret := processRebase(repository{
-			owner:    "test",
-			name:     "test",
-			mainline: "master",
-			cache: fakeWorkerCache(func(branch string) (repo.Enqueuer, error) {
+		ret := Rebase(Repository{
+			Owner:    "test",
+			Name:     "test",
+			Mainline: "master",
+			Cache: fakeWorkerCache(func(branch string) (repo.Enqueuer, error) {
 				return fakeEnqueuer(func() repo.Signal { return repo.Signal{UpToDate: false} }), nil
 			}),
 		}, ch)
@@ -123,11 +122,11 @@ func TestProcessRebase(t *testing.T) {
 
 	t.Run("filters error'd branches", func(t *testing.T) {
 		ch := make(chan *github.PullRequest)
-		ret := processRebase(repository{
-			owner:    "test",
-			name:     "test",
-			mainline: "master",
-			cache: fakeWorkerCache(func(branch string) (repo.Enqueuer, error) {
+		ret := Rebase(Repository{
+			Owner:    "test",
+			Name:     "test",
+			Mainline: "master",
+			Cache: fakeWorkerCache(func(branch string) (repo.Enqueuer, error) {
 				return fakeEnqueuer(func() repo.Signal { return repo.Signal{Error: errors.New("git: unknown binary")} }), nil
 			}),
 		}, ch)
@@ -149,11 +148,11 @@ func TestProcessRebase(t *testing.T) {
 
 	t.Run("passes through up2date branches", func(t *testing.T) {
 		ch := make(chan *github.PullRequest)
-		ret := processRebase(repository{
-			owner:    "test",
-			name:     "test",
-			mainline: "master",
-			cache: fakeWorkerCache(func(branch string) (repo.Enqueuer, error) {
+		ret := Rebase(Repository{
+			Owner:    "test",
+			Name:     "test",
+			Mainline: "master",
+			Cache: fakeWorkerCache(func(branch string) (repo.Enqueuer, error) {
 				return fakeEnqueuer(func() repo.Signal { return repo.Signal{UpToDate: true} }), nil
 			}),
 		}, ch)

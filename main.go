@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/google/go-github/github"
+	"github.com/nicolai86/github-rebase-bot/processors"
 	"github.com/nicolai86/github-rebase-bot/repo"
 	"golang.org/x/oauth2"
 )
@@ -28,7 +29,7 @@ type repositories []repository
 
 func (rs repositories) Find(owner, name string) *repository {
 	for i := range rs {
-		if rs[i].owner == owner && rs[i].name == name {
+		if rs[i].Owner == owner && rs[i].Name == name {
 			return &rs[i]
 		}
 	}
@@ -51,15 +52,12 @@ func (hps *repositories) Set(str string) error {
 }
 
 type repository struct {
-	owner    string
-	name     string
-	mainline string
-	cache    WorkerCache
-	hook     *github.Hook
+	processors.Repository
+	hook *github.Hook
 }
 
 func (h *repository) String() string {
-	return fmt.Sprintf("%s/%s#%s", h.owner, h.name, h.mainline)
+	return fmt.Sprintf("%s/%s#%s", h.Owner, h.Name, h.Mainline)
 }
 
 func (h *repository) Set(str string) error {
@@ -67,14 +65,14 @@ func (h *repository) Set(str string) error {
 	if len(parts) != 2 {
 		return fmt.Errorf("Invalid repository %q. Must be owner/name", str)
 	}
-	h.owner = parts[0]
+	h.Owner = parts[0]
 	parts = strings.Split(parts[1], "#")
-	h.name = parts[0]
+	h.Name = parts[0]
 	if len(parts) == 2 {
-		h.mainline = parts[1]
+		h.Mainline = parts[1]
 	}
-	if h.mainline == "" {
-		h.mainline = "master"
+	if h.Mainline == "" {
+		h.Mainline = "master"
 	}
 	return nil
 }
@@ -124,12 +122,12 @@ func main() {
 	}
 
 	for i, r := range repos {
-		url := fmt.Sprintf("https://%s@github.com/%s/%s.git", token, r.owner, r.name)
-		c, err := repo.Prepare(url, r.mainline)
+		url := fmt.Sprintf("https://%s@github.com/%s/%s.git", token, r.Owner, r.Name)
+		c, err := repo.Prepare(url, r.Mainline)
 		if err != nil {
 			log.Fatalf("prepare failed: %v", err)
 		}
-		repos[i].cache = c
+		repos[i].Cache = c
 	}
 
 	// On ^C, or SIGTERM handle exit.
@@ -139,7 +137,7 @@ func main() {
 
 	mux := http.NewServeMux()
 	for _, repo := range repos {
-		mux.HandleFunc(fmt.Sprintf("/events/%s/%s", repo.owner, repo.name), prHandler(repo, client))
+		mux.HandleFunc(fmt.Sprintf("/events/%s/%s", repo.Owner, repo.Name), prHandler(repo, client))
 	}
 	srv := &http.Server{
 		Addr:    addr,
@@ -153,7 +151,7 @@ func main() {
 	var h *github.Hook
 	if publicDNS != "" {
 		for i, repo := range repos {
-			h, err = registerHook(client, publicDNS, repo.owner, repo.name)
+			h, err = registerHook(client, publicDNS, repo.Owner, repo.Name)
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -168,7 +166,7 @@ func main() {
 	log.Printf("Received %s, exiting.", sig.String())
 	if h != nil {
 		for _, repo := range repos {
-			client.Repositories.DeleteHook(context.Background(), repo.owner, repo.name, *repo.hook.ID)
+			client.Repositories.DeleteHook(context.Background(), repo.Owner, repo.Name, *repo.hook.ID)
 		}
 	}
 }

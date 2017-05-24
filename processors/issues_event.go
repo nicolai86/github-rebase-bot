@@ -1,4 +1,4 @@
-package main
+package processors
 
 import (
 	"context"
@@ -6,8 +6,8 @@ import (
 	"github.com/google/go-github/github"
 )
 
-// processIssuesEvent filters out issues and allows pull requests
-func processIssuesEvent(client PullRequestGetter, input <-chan *github.IssuesEvent) <-chan *github.PullRequest {
+// IssuesEvent filters out events on issues which are not pull requests
+func IssuesEvent(client PullRequestGetter, input <-chan *github.IssuesEvent) <-chan *github.PullRequest {
 	ret := make(chan *github.PullRequest)
 	go func() {
 		for evt := range input {
