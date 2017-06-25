@@ -112,6 +112,22 @@ func prHandler(r repository, client *github.Client) http.HandlerFunc {
 		}
 	}()
 
+	// evaluate all open PRs on startup to kick off new rebase if necessary
+	prs, _, err := client.PullRequests.List(
+		context.Background(),
+		r.owner,
+		r.name,
+		&github.PullRequestListOptions{
+			State: "open",
+		})
+	if err != nil {
+		log.Printf("failed to populate open PRs on startup: %v", err)
+	} else {
+		for _, pr := range prs {
+			prQueue <- pr
+		}
+	}
+
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		eventType := req.Header.Get("X-GitHub-Event")
 
