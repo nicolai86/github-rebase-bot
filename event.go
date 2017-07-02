@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/google/go-github/github"
 	"github.com/nicolai86/github-rebase-bot/processors"
@@ -59,8 +60,55 @@ func prHandler(r repository, client *github.Client) http.HandlerFunc {
 		processors.PullRequestReviewEvent(client, reviewQueue),
 	))
 
+	handleRebase := func(input <-chan processors.RebaseResult) <-chan *github.PullRequest {
+		ret := make(chan *github.PullRequest)
+		go func() {
+			for res := range input {
+				if res.Error == nil {
+					ret <- res.PR
+					continue
+				}
+
+				// retry PRs where mainline changed during the rebase
+				if res.Error == processors.ErrMainlineChanged {
+					prQueue <- res.PR
+					continue
+				}
+				cs, _, err := client.PullRequests.ListComments(
+					context.Background(),
+					res.PR.Base.Repo.Owner.GetLogin(),
+					res.PR.Base.Repo.GetName(),
+					res.PR.GetNumber(),
+					&github.PullRequestListCommentsOptions{},
+				)
+				if err != nil {
+					log.Printf("failed to fetch comments on PR #%d: %v", res.PR.GetNumber(), err)
+					continue
+				}
+				hasConflictComment := false
+				for _, c := range cs {
+					if c.Body == nil {
+						continue
+					}
+					hasConflictComment = hasConflictComment || strings.Contains(*c.Body, "can't rebase")
+				}
+				if !hasConflictComment {
+					body := fmt.Sprintf("can't rebase %s because of a conflict:\n```\n%s\n```\n", r.Mainline, res.Error)
+					client.PullRequests.CreateComment(
+						context.Background(),
+						res.PR.Base.Repo.Owner.GetLogin(),
+						res.PR.Base.Repo.GetName(),
+						res.PR.GetNumber(), &github.PullRequestComment{
+							Body: &body,
+						})
+				}
+			}
+		}()
+		return ret
+	}
+
 	doneQueue := processors.Merge(client,
-		processors.Rebase(r.Repository, rebaseQueue),
+		handleRebase(processors.Rebase(r.Repository, rebaseQueue)),
 	)
 
 	go func() {
