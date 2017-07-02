@@ -87,8 +87,8 @@ func prHandler(r repository, client *github.Client) http.HandlerFunc {
 	// evaluate all open PRs on startup to kick off new rebase if necessary
 	prs, _, err := client.PullRequests.List(
 		context.Background(),
-		r.owner,
-		r.name,
+		r.Owner,
+		r.Name,
 		&github.PullRequestListOptions{
 			State: "open",
 		})
