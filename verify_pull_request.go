@@ -8,23 +8,14 @@ import (
 	"github.com/google/go-github/github"
 )
 
-// PullRequestGetter queries github for a specific pull request
-type PullRequestGetter interface {
-	Get(context.Context, string, string, int) (*github.PullRequest, *github.Response, error)
-}
-
-// PullRequestLister queries github for all pull requests
-type PullRequestLister interface {
-	List(context.Context, string, string, *github.PullRequestListOptions) ([]*github.PullRequest, *github.Response, error)
+// StatusGetter fetches the status of a specific commit
+type StatusGetter interface {
+	GetCombinedStatus(context.Context, string, string, string, *github.ListOptions) (*github.CombinedStatus, *github.Response, error)
 }
 
 // IssueGetter queries github for a specific issue
 type IssueGetter interface {
 	Get(context.Context, string, string, int) (*github.Issue, *github.Response, error)
-}
-
-type StatusGetter interface {
-	GetCombinedStatus(context.Context, string, string, string, *github.ListOptions) (*github.CombinedStatus, *github.Response, error)
 }
 
 // verifyPullRequest filters out non-mergeable pull requests

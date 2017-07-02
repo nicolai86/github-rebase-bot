@@ -1,4 +1,4 @@
-package main
+package processors
 
 import (
 	"context"
@@ -13,7 +13,7 @@ func (f fakePullRequestGetter) Get(ctx context.Context, _ string, _ string, _ in
 	return f()
 }
 
-func TestProcessIssuesEvent_Filter(t *testing.T) {
+func TestIssuesEvent_Filter(t *testing.T) {
 	notAPullRequest := fakePullRequestGetter(func() (*github.PullRequest, *github.Response, error) {
 		return nil, nil, nil
 	})
@@ -31,7 +31,7 @@ func TestProcessIssuesEvent_Filter(t *testing.T) {
 
 	ch := make(chan *github.IssuesEvent, 1)
 
-	prs := processIssuesEvent(notAPullRequest, ch)
+	prs := IssuesEvent(notAPullRequest, ch)
 	ch <- &evt
 	close(ch)
 
@@ -40,7 +40,7 @@ func TestProcessIssuesEvent_Filter(t *testing.T) {
 	}
 }
 
-func TestProcessIssuesEvent_PassThrough(t *testing.T) {
+func TestIssuesEvent_PassThrough(t *testing.T) {
 	aPullRequest := fakePullRequestGetter(func() (*github.PullRequest, *github.Response, error) {
 		return &github.PullRequest{
 			Number: intVal(1),
@@ -60,7 +60,7 @@ func TestProcessIssuesEvent_PassThrough(t *testing.T) {
 
 	ch := make(chan *github.IssuesEvent, 1)
 
-	prs := processIssuesEvent(aPullRequest, ch)
+	prs := IssuesEvent(aPullRequest, ch)
 	ch <- &evt
 	close(ch)
 

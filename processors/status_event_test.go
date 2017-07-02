@@ -1,69 +1,12 @@
-package main
+package processors
 
 import (
 	"context"
 	"fmt"
-	"sync"
 	"testing"
 
 	"github.com/google/go-github/github"
 )
-
-func TestStatusEventBroadcaster(t *testing.T) {
-	inp := make(chan *github.StatusEvent)
-	q1 := make(chan *github.StatusEvent)
-	q2 := make(chan *github.StatusEvent)
-	b := statusEventBroadcaster{listeners: []chan<- *github.StatusEvent{q1, q2}}
-	go b.Listen(inp)
-	defer close(inp)
-
-	w := sync.WaitGroup{}
-	w.Add(2)
-	go func() {
-		<-q1
-		w.Done()
-	}()
-	go func() {
-		<-q2
-		w.Done()
-	}()
-	inp <- &github.StatusEvent{}
-	w.Wait()
-}
-
-func TestProcessMainlineStatusEvent(t *testing.T) {
-	ch := make(chan *github.StatusEvent, 1)
-
-	t.Run("adds open PRs on mainline success", func(t *testing.T) {
-		out := processMainlineStatusEvent(repository{
-			owner:    "test",
-			name:     "test",
-			mainline: "master",
-		}, fakePullRequestResponse(2), ch)
-		ch <- &github.StatusEvent{
-			State: stringVal("success"),
-			Branches: []*github.Branch{
-				{
-					Name: stringVal("master"),
-				},
-			},
-			Repo: &github.Repository{
-				Name: stringVal("test"),
-				Owner: &github.User{
-					Login: stringVal("test"),
-				},
-			},
-		}
-		close(ch)
-
-		if _, ok := <-out; !ok {
-			t.Fatal("Expected output on PR, but didn't receive")
-		}
-		if _, ok := <-out; !ok {
-			t.Fatal("Expected output on PR, but didn't receive")
-		}
-	})
-}
 
 type fakePullRequestLister func() ([]*github.PullRequest, *github.Response, error)
 
@@ -93,12 +36,12 @@ func fakePullRequestResponse(n int) fakePullRequestLister {
 	})
 }
 
-func TestProcessStatusEvent_Filters(t *testing.T) {
+func TestStatusEvent_Filters(t *testing.T) {
 	for _, state := range []string{"pending", "failure", "error"} {
 		t.Run(fmt.Sprintf("%s status", state), func(t *testing.T) {
 			ch := make(chan *github.StatusEvent, 1)
 
-			prs := processStatusEvent(nil, ch)
+			prs := StatusEvent(nil, ch)
 			ch <- &github.StatusEvent{
 				State: stringVal(state),
 				Repo: &github.Repository{
@@ -119,7 +62,7 @@ func TestProcessStatusEvent_Filters(t *testing.T) {
 	t.Run("closed pull-requests", func(t *testing.T) {
 		ch := make(chan *github.StatusEvent, 1)
 
-		prs := processStatusEvent(fakePullRequestLister(func() ([]*github.PullRequest, *github.Response, error) {
+		prs := StatusEvent(fakePullRequestLister(func() ([]*github.PullRequest, *github.Response, error) {
 			return []*github.PullRequest{}, nil, nil
 		}), ch)
 		ch <- &github.StatusEvent{
@@ -142,10 +85,10 @@ func TestProcessStatusEvent_Filters(t *testing.T) {
 	})
 }
 
-func TestProcessStatusEvent_PassThrough(t *testing.T) {
+func TestStatusEvent_PassThrough(t *testing.T) {
 	ch := make(chan *github.StatusEvent, 1)
 
-	prs := processStatusEvent(fakePullRequestResponse(1), ch)
+	prs := StatusEvent(fakePullRequestResponse(1), ch)
 	ch <- &github.StatusEvent{
 		State: stringVal("success"),
 		Branches: []*github.Branch{
