@@ -89,7 +89,7 @@ func TestRebase(t *testing.T) {
 			},
 		}
 		close(ch)
-		if v, ok := (<-ret); v != nil || ok {
+		if v, ok := (<-ret); v.Error == nil || !ok {
 			t.Fatal("Expected pull request to be skipped")
 		}
 	})
@@ -115,7 +115,7 @@ func TestRebase(t *testing.T) {
 			},
 		}
 		close(ch)
-		if v, ok := (<-ret); v != nil || ok {
+		if v, ok := (<-ret); v.Error != nil || ok {
 			t.Fatal("Expected pull request to be skipped")
 		}
 	})
@@ -141,7 +141,7 @@ func TestRebase(t *testing.T) {
 			},
 		}
 		close(ch)
-		if v, ok := (<-ret); v != nil || ok {
+		if v, ok := (<-ret); v.Error == nil || !ok {
 			t.Fatal("Expected pull request to be skipped")
 		}
 	})
@@ -167,7 +167,7 @@ func TestRebase(t *testing.T) {
 			},
 		}
 		close(ch)
-		if v, ok := (<-ret); v == nil || !ok {
+		if v, ok := (<-ret); v.Error != nil || !ok {
 			t.Fatal("Expected pull request to pass through")
 		}
 	})

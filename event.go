@@ -59,8 +59,30 @@ func prHandler(r repository, client *github.Client) http.HandlerFunc {
 		processors.PullRequestReviewEvent(client, reviewQueue),
 	))
 
+	handleRebase := func(input <-chan processors.RebaseResult) <-chan *github.PullRequest {
+		ret := make(chan *github.PullRequest)
+		go func() {
+			for res := range input {
+				// allow PRs which rebased without error to pass through
+				if res.Error == nil {
+					ret <- res.PR
+					continue
+				}
+
+				// retry PRs where mainline changed during the rebase
+				if res.Error == processors.ErrMainlineChanged {
+					prQueue <- res.PR
+					continue
+				}
+
+				log.Printf("filtering PR #%d on %s because of %v", res.PR.GetNumber(), r.Name, res.Error)
+			}
+		}()
+		return ret
+	}
+
 	doneQueue := processors.Merge(client,
-		processors.Rebase(r.Repository, rebaseQueue),
+		handleRebase(processors.Rebase(r.Repository, rebaseQueue)),
 	)
 
 	go func() {
