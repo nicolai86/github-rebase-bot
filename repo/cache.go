@@ -40,6 +40,7 @@ func (c *Cache) Update() (string, error) {
 	stdout, stderr, err := cmd.Pipeline([]*exec.Cmd{
 		cmd.MustConfigure(exec.Command("git", "fetch", "--all"), c.inCacheDirectory()),
 		cmd.MustConfigure(exec.Command("git", "reset", "--hard", fmt.Sprintf("origin/%s", c.mainline)), c.inCacheDirectory()),
+		cmd.MustConfigure(exec.Command("git", "clean", "-f", "-d", "-x"), c.inCacheDirectory()),
 		cmd.MustConfigure(exec.Command("git", "rev-parse", "HEAD"), c.inCacheDirectory()),
 	}).Run()
 	log.PrintLinesPrefixed(c.mainline, stdout)

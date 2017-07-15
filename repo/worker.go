@@ -102,6 +102,7 @@ func (w *Worker) update(dir string) error {
 	stdout, stderr, err := cmd.Pipeline([]*exec.Cmd{
 		cmd.MustConfigure(exec.Command("git", "fetch", "origin", w.branch), inDir(dir)),
 		cmd.MustConfigure(exec.Command("git", "reset", "--hard", fmt.Sprintf("origin/%s", w.branch)), inDir(dir)),
+		cmd.MustConfigure(exec.Command("git", "clean", "-f", "-d", "-x"), inDir(dir)),
 	}).Run()
 	log.PrintLinesPrefixed(w.branch, stdout)
 	log.PrintLinesPrefixed(w.branch, stderr)
